@@ -1,6 +1,8 @@
 package main
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestParserWithoutError(t *testing.T) {
 	x := &token{
@@ -21,5 +23,22 @@ func TestParserWithError(t *testing.T) {
 	_, err := x.parse("222")	
 	if err == nil {
 		t.Fatalf("Test failed for token %d and string %s. Expected error but nil", x.val, "222")	
+	}
+}
+
+func TestOrCombinator(t *testing.T) {
+	x := &parser{
+		tokens: []token{
+			token{'1'},
+			token{'2'},
+			token{'3'},
+		},
+		op: or,
+	}
+
+	_, err := x.parse("123")
+
+	if err != nil {
+		t.Fatalf("OrCombinator test failed for tokens %v and string %s", x, "123")
 	}
 }
