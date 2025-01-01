@@ -4,72 +4,87 @@ import (
 	"fmt"
 )
 
-type result struct {
-	parsedResult interface{}
-	remString    string
+type state struct {
+	input 	string
+	offset 	int
 }
 
-type Parser func(input string) (result, error)
+type result struct {
+	parsedResult interface{}
+	nextState 	 state
+}
+
+type Parser func(curState state) (result, error)
+
+// advance n places
+func (s state) advance(n int) state {
+	return state{
+		s.input,
+		s.offset+n,
+	}
+}
 
 // basic char parser
 func charParser(c byte) Parser {
-	return func(input string) (result, error) {
-		if len(input) == 0 || input[0] != c {
+	return func(curState state) (result, error) {
+		if curState.offset >= len(curState.input) || curState.input[curState.offset] != c {
 			return result{}, fmt.Errorf("expected %c", c)
 		}
 
 		return result{
 			string(c), 
-			input[1:],
+			curState.advance(1),
 		}, nil
 	}
 }
 
 func String(s string) Parser{
-	return func(input string) (result, error) {
-		if input != s{
+	return func(curState state) (result, error) {
+		if curState.input[curState.offset:] != s{
 			return result{}, fmt.Errorf("expected %s", s)
 		}
 
 		return result{
 			s,
-			"",
+			curState.advance(len(s)),
 		}, nil
 	}
 }
 
-func or(left Parser, right Parser) Parser {
-	return func(input string) (result, error) {
-		leftRes, err := left(input)
+func Or(left Parser, right Parser) Parser {
+	return func(curState state) (result, error) {
+		leftRes, err := left(curState)
 		if err != nil {
-			return right(input)
+			curState = leftRes.nextState
+			return right(curState)
 		}
 		return leftRes, nil
 	}
 }
 
-func and(left Parser, right Parser) Parser {
-	return func(input string) (result, error) {
-		leftRes, err := left(input)
+func And(left Parser, right Parser) Parser {
+	return func(curState state) (result, error) {
+		leftRes, err := left(curState)
 		if err != nil {
 			return result{}, fmt.Errorf("err in parsing \"and\"")
 		}
-	
-		rightRes, err := right(leftRes.remString)
+		
+		curState = leftRes.nextState
+		rightRes, err := right(curState)
 		if err != nil {
 			return result{}, fmt.Errorf("err in parsing \"and\"")
 		}
 
 		return result{
 			[]interface{}{leftRes.parsedResult, rightRes.parsedResult},
-			rightRes.remString,
+			rightRes.nextState,
 		}, nil
 	}
 }
 
 func Map[A, B any](p Parser, mapping func(A) B) Parser {
-	return func(input string) (result, error) {
-		res, err := p(input)
+	return func(curState state) (result, error) {
+		res, err := p(curState)
 
 		if err != nil{
 			return result{}, err
@@ -77,38 +92,38 @@ func Map[A, B any](p Parser, mapping func(A) B) Parser {
 
 		return result{
 			mapping(res.parsedResult.(A)),
-			res.remString,
+			res.nextState,
 		}, nil
 	}
 }
 
 func Many0(p Parser) Parser {
-	return func(input string) (result, error) {
+	return func(curState state) (result, error) {
 		var res []interface{}
-		for len(input) != 0{
-			x, err := p(input)
+		for curState.offset < len(curState.input){
+			x, err := p(curState)
 			if err != nil {
 				return result{
 					res,
-					input,
+					curState, // fallback
 				}, nil
 			}
 			res = append(res, x.parsedResult)
-			input = x.remString
+			curState = x.nextState
 		}
 
 		return result{
 			res,
-			input,	
+			curState,	
 		}, nil
 	}
 }
 
 func Many1(p Parser) Parser {
-	return func(input string) (result, error) {
+	return func(curState state) (result, error) {
 		var res []interface{}
-		for len(input) != 0{
-			x, err := p(input)
+		for curState.offset < len(curState.input){
+			x, err := p(curState)
 			if err != nil{
 				if len(res) == 0{
 					return result{}, err
@@ -116,35 +131,35 @@ func Many1(p Parser) Parser {
 
 				return result{
 					res,
-					input,
+					x.nextState,
 				}, nil
 			}
 			res = append(res, x.parsedResult)
-			input = x.remString
+			curState = x.nextState
 		}
 
 		return result{
 			res,
-			input,	
+			curState,	
 		}, nil
 	}
 }
 
 func Seq(parsers ...Parser) Parser {
-	return func (input string) (result, error) {
+	return func (curState state) (result, error) {
 		var res []interface{}
 		for _, parser := range parsers{
-			x, err := parser(input)
+			x, err := parser(curState)
 			if err != nil{
 				return result{}, err
 			}
 			res = append(res, x.parsedResult)
-			input = x.remString
+			curState = x.nextState
 		}
 
 		return result{
 			res,
-			input,
+			curState,
 		}, nil
 	}
 }
