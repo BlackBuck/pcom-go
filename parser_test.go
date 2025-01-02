@@ -43,7 +43,10 @@ func TestCharParserFail(t *testing.T) {
 
 	res, err := charParser(curState)
 
-	exp := result{}
+	exp := result{
+		nil,
+		curState,
+	}
 
 	if err == nil {
 		t.Fatalf("char parsing test failed. Expected err got %v", exp)
@@ -91,7 +94,10 @@ func TestOrCombinatorFail(t *testing.T) {
 	charOrDigit := Or(charParser(t1), charParser(t2))
 	res, err := charOrDigit(curState)
 
-	exp := result{}
+	exp := result{
+		nil,
+		curState,
+	}
 	
 	if err == nil {
 		t.Fatalf("Or combinator test failed. Expected error got %v.", exp)
@@ -142,10 +148,10 @@ func TestAndCombinatorFail(t *testing.T) {
 	charAndDigit := And(charParser(t1), charParser(t2))
 	res, err := charAndDigit(curState)
 
-	// This is a work-around for the DeepEqual function because, 
-	// somehow, the array I initialised wasn't interned (string interning)
-	// and the string pointers were different and they weren't deeply equal :<
-	exp := result{}
+	exp := result{
+		nil,
+		curState,
+	}
 	
 	if err == nil {
 		t.Fatalf("Or combinator test failed. Expected %v got error.", exp)
@@ -199,7 +205,10 @@ func TestMapCombinatorFail(t *testing.T) {
 	mapcomb := Map(ch, mapfunc)
 	res, err := mapcomb(curState)
 
-	exp := result{}
+	exp := result{
+		nil,
+		curState,
+	}	
 
 	if err == nil {
 		t.Fatalf("Map test failed. Expected %v but received %v and error", exp, res)
@@ -265,7 +274,10 @@ func TestMany1CombinatorFail(t *testing.T) {
 
 	_, err := m1(curState)
 
-	exp := result{}
+	exp := result{
+		nil,
+		curState,
+	}
 
 	if err == nil{
 		t.Fatalf("Many0 combinator test failed. Expected %v but got error.", exp)
@@ -293,6 +305,6 @@ func TestSeqCombinatorPass(t *testing.T) {
 		},
 	}
 	if err != nil {
-		t.Fatalf("seq combinator test failed. expected %v but received %v and error.", exp, res)
+		t.Fatalf("seq combinator test failed. expected %v but received %v and error.\nThe error: %s", exp, res, err.Error())
 	}
 }
