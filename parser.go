@@ -5,13 +5,13 @@ import (
 )
 
 type state struct {
-	input 	string
-	offset 	int
+	input  string
+	offset int
 }
 
 type result struct {
 	parsedResult interface{}
-	nextState 	 state
+	nextState    state
 }
 
 type Parser func(curState state) (result, error)
@@ -20,7 +20,7 @@ type Parser func(curState state) (result, error)
 func (s state) advance(n int) state {
 	return state{
 		s.input,
-		s.offset+n,
+		s.offset + n,
 	}
 }
 
@@ -28,20 +28,26 @@ func (s state) advance(n int) state {
 func charParser(c byte) Parser {
 	return func(curState state) (result, error) {
 		if curState.offset >= len(curState.input) || curState.input[curState.offset] != c {
-			return result{}, fmt.Errorf("expected %c", c)
+			return result{
+				nil,
+				curState,
+			}, fmt.Errorf("expected %c but received %c. \ncurrent state: %v", c, curState.input[curState.offset], curState)
 		}
 
 		return result{
-			string(c), 
+			string(c),
 			curState.advance(1),
 		}, nil
 	}
 }
 
-func String(s string) Parser{
+func String(s string) Parser {
 	return func(curState state) (result, error) {
-		if curState.input[curState.offset:] != s{
-			return result{}, fmt.Errorf("expected %s", s)
+		if curState.input[curState.offset:] != s {
+			return result{
+				nil,
+				curState,
+			}, fmt.Errorf("expected %s", s)
 		}
 
 		return result{
@@ -66,13 +72,22 @@ func And(left Parser, right Parser) Parser {
 	return func(curState state) (result, error) {
 		leftRes, err := left(curState)
 		if err != nil {
-			return result{}, fmt.Errorf("err in parsing \"and\"")
+			return result{
+				nil,
+				curState,
+			}, fmt.Errorf("err in parsing \"and\"")
 		}
-		
-		curState = leftRes.nextState
-		rightRes, err := right(curState)
+
+		// Don't assign leftRes.nextState directly to curState
+		// because if right parser results in an error, we
+		// won't have anything for fallback
+		next := leftRes.nextState
+		rightRes, err := right(next)
 		if err != nil {
-			return result{}, fmt.Errorf("err in parsing \"and\"")
+			return result{
+				nil,
+				curState,
+			}, fmt.Errorf("err in parsing \"and\"")
 		}
 
 		return result{
@@ -86,8 +101,11 @@ func Map[A, B any](p Parser, mapping func(A) B) Parser {
 	return func(curState state) (result, error) {
 		res, err := p(curState)
 
-		if err != nil{
-			return result{}, err
+		if err != nil {
+			return result{
+				nil,
+				curState,
+			}, err
 		}
 
 		return result{
@@ -100,12 +118,12 @@ func Map[A, B any](p Parser, mapping func(A) B) Parser {
 func Many0(p Parser) Parser {
 	return func(curState state) (result, error) {
 		var res []interface{}
-		for curState.offset < len(curState.input){
+		for curState.offset < len(curState.input) {
 			x, err := p(curState)
 			if err != nil {
 				return result{
 					res,
-					curState, // fallback
+					curState, 
 				}, nil
 			}
 			res = append(res, x.parsedResult)
@@ -114,7 +132,7 @@ func Many0(p Parser) Parser {
 
 		return result{
 			res,
-			curState,	
+			curState,
 		}, nil
 	}
 }
@@ -122,11 +140,14 @@ func Many0(p Parser) Parser {
 func Many1(p Parser) Parser {
 	return func(curState state) (result, error) {
 		var res []interface{}
-		for curState.offset < len(curState.input){
+		for curState.offset < len(curState.input) {
 			x, err := p(curState)
-			if err != nil{
-				if len(res) == 0{
-					return result{}, err
+			if err != nil {
+				if len(res) == 0 {
+					return result{
+						nil,
+						curState,
+					}, err
 				}
 
 				return result{
@@ -140,26 +161,30 @@ func Many1(p Parser) Parser {
 
 		return result{
 			res,
-			curState,	
+			curState,
 		}, nil
 	}
 }
 
 func Seq(parsers ...Parser) Parser {
-	return func (curState state) (result, error) {
+	return func(curState state) (result, error) {
 		var res []interface{}
-		for _, parser := range parsers{
-			x, err := parser(curState)
-			if err != nil{
-				return result{}, err
+		next := curState
+		for _, parser := range parsers {
+			x, err := parser(next)
+			if err != nil {
+				return result{
+					nil,
+					curState, // fallback to the initial state
+				}, err
 			}
 			res = append(res, x.parsedResult)
-			curState = x.nextState
+			next = x.nextState
 		}
 
 		return result{
 			res,
-			curState,
+			next,
 		}, nil
 	}
 }
