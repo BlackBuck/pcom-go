@@ -25,13 +25,20 @@ func (s state) advance(n int) state {
 }
 
 // basic char parser
-func charParser(c byte) Parser {
+func CharParser(c byte) Parser {
 	return func(curState state) (result, error) {
-		if curState.offset >= len(curState.input) || curState.input[curState.offset] != c {
+		if curState.offset >= len(curState.input) {
 			return result{
 				nil,
 				curState,
-			}, fmt.Errorf("expected %c but received %c. \ncurrent state: %v", c, curState.input[curState.offset], curState)
+			}, fmt.Errorf("reached the end of input string while parsing")
+		}
+
+		if curState.input[curState.offset] != c {
+			return result{
+				nil,
+				curState,
+			}, fmt.Errorf("expected %c but received %c", c, curState.input[curState.offset])
 		}
 
 		return result{
@@ -186,5 +193,65 @@ func Seq(parsers ...Parser) Parser {
 			res,
 			next,
 		}, nil
+	}
+}
+
+func Optional(p Parser) Parser {
+	return func(curState state) (result, error) {
+		res, err := p(curState)
+		if err != nil {
+			return result{
+				nil,
+				curState,
+			}, nil
+		}
+
+		return result{
+			res.parsedResult,
+			res.nextState,
+		}, nil
+	}
+}
+
+func Between(open, content, close Parser) Parser {
+	return func(curState state) (result, error) {
+		openRes, err := open(curState)
+		if err != nil {
+			return result{
+				nil,
+				curState,
+			}, err
+		}
+
+		contentRes, err := content(openRes.nextState)
+		if err != nil {
+			return result{
+				nil,
+				curState,
+			}, err
+		}
+
+		closeRes, err := close(contentRes.nextState)
+		if err != nil {
+			return result{
+				nil, 
+				curState,
+			}, err
+		}
+
+		return result{
+			contentRes.parsedResult,
+			closeRes.nextState,
+		}, nil
+	}
+}
+
+func Lazy(f func() Parser) Parser {
+	var memo Parser
+	return func(curState state) (result, error) {
+		if memo == nil {
+			memo = f()
+		} 
+		return memo(curState)
 	}
 }
