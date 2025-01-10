@@ -1,3 +1,3 @@
-module github.com/BlackBuck/pcom-go
+module parser
 
 go 1.22.5
