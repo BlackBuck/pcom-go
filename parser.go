@@ -1,4 +1,4 @@
-package pcomgo
+package main
 
 import (
 	"fmt"
