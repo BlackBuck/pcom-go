@@ -34,6 +34,22 @@ func NewState(input string, offset int) State {
 // The Parser type should've(ideally) been a struct, but with generic types it created a LOT of overhead.
 type Parser func(curState State) (Result, error)
 
+// Check if there are characters available for parsing
+func (s State) HasAvailableChars(n int) bool {
+	return s.offset < (len(s.input) - n + 1)
+}
+
+// Consume one character and return
+func (s State) Consume(n int) (string, error) {
+	if !s.HasAvailableChars(n) {
+		return "", fmt.Errorf("not sufficient characters available for parsing")
+	}
+
+	res := s.input[s.offset:s.offset+n]
+	s = s.Advance(n)
+	return res, nil
+}
+
 // Advance n places
 func (s State) Advance(n int) State {
 	return State{
