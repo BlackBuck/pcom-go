@@ -59,6 +59,38 @@ func TestConsumeFail(t *testing.T) {
 	}
 }
 
+func TestPeekCharPass(t *testing.T) {
+	s := State{
+		"abcd",
+		0,
+	}
+
+	res, err := s.PeekChar()
+
+	exp := 'a'
+	if err != nil || res == 0 {
+		t.Fatalf("PeekChar test failed. Expected %s but received the following error:\n %s", string(exp), err.Error())
+	}
+
+	if rune(res) != exp {
+		t.Fatalf("PeekChar test failed. Expected %s but received %s", string(exp), string(rune(res)))
+	}
+
+}
+
+func TestPeekCharFail(t *testing.T) {
+	s := State{
+		"abcd",
+		4,
+	}
+
+	res, err := s.PeekChar()
+
+	if err == nil {
+		t.Fatalf("PeekChar test failed. Expected error but received %s", string(rune(res)))
+	}
+}
+
 func TestCharParserPass(t *testing.T) {
 	c := byte('c')
 	CharParser := CharParser(c)
