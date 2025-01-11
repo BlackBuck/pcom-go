@@ -47,7 +47,18 @@ func (s State) Consume(n int) (string, error) {
 
 	res := s.input[s.offset:s.offset+n]
 	s = s.Advance(n)
-	
+
+	return res, nil
+}
+
+// Peek one char -- consume without advancing
+func (s State) PeekChar() (byte, error) {
+	if !s.HasAvailableChars(1) {
+		return 0, fmt.Errorf("not sufficient characters available for parsing")
+	}
+
+	res := s.input[s.offset]
+
 	return res, nil
 }
 
