@@ -59,6 +59,7 @@ func (s State) PeekChar() (byte, error) {
 
 	res := s.input[s.offset]
 
+	s = s.Advance(n)
 	return res, nil
 }
 
