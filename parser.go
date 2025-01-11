@@ -34,8 +34,8 @@ func NewState(input string, offset int) State {
 // The Parser type should've(ideally) been a struct, but with generic types it created a LOT of overhead.
 type Parser func(curState State) (Result, error)
 
-// advance n places
-func (s State) advance(n int) State {
+// Advance n places
+func (s State) Advance(n int) State {
 	return State{
 		s.input,
 		s.offset + n,
@@ -61,7 +61,7 @@ func CharParser(c byte) Parser {
 
 		return NewResult(
 			string(c),
-			curState.advance(1),
+			curState.Advance(1),
 		), nil
 	}
 }
@@ -79,7 +79,7 @@ func String(s string) Parser {
 
 		return NewResult(
 			s,
-			curState.advance(len(s)),
+			curState.Advance(len(s)),
 		), nil
 	}
 }
