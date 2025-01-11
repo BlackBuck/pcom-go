@@ -46,7 +46,7 @@ func (s State) Consume(n int) (string, error) {
 	}
 
 	res := s.input[s.offset:s.offset+n]
-	s.Advance(n)
+	s = s.Advance(n)
 	return res, nil
 }
 
