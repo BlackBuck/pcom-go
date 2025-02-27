@@ -6,26 +6,111 @@ import (
 	"testing"
 )
 
+func TestHasAvailableCharsPass(t *testing.T) {
+	s := State{
+		"abcd",
+		0,
+	}
+
+	if res := s.HasAvailableChars(4); !res {
+		t.Fatalf("HasAvailableChars test failed. Expected true received false.")
+	}
+}
+
+func TestHasAvailableCharsFail(t *testing.T) {
+	s := State{
+		"abcd",
+		0,
+	}
+
+	if res := s.HasAvailableChars(5); res {
+		t.Fatalf("HasAvailableChars test failed. Expected false received true.")
+	}
+}
+
+func TestConsumePass(t *testing.T) {
+	s := State{
+		"abcd",
+		0,
+	}
+
+	res, err := s.Consume(3)
+
+	exp := "abc"
+	if err != nil {
+		t.Fatalf("Consume test failed. Expected %s received the following error:\n %s", exp, err.Error())
+	}
+
+	if res != exp {
+		t.Fatalf("Consume test failed. Expected %s but received %s", exp, res)
+	}
+}
+
+func TestConsumeFail(t *testing.T) {
+	s := State{
+		"abcd",
+		0,
+	}
+
+	res, err := s.Consume(5)
+
+	if err == nil {
+		t.Fatalf("Consume test failed. Expected error but received %s", res)
+	}
+}
+
+func TestPeekCharPass(t *testing.T) {
+	s := State{
+		"abcd",
+		0,
+	}
+
+	res, err := s.PeekChar()
+
+	exp := 'a'
+	if err != nil || res == 0 {
+		t.Fatalf("PeekChar test failed. Expected %s but received the following error:\n %s", string(exp), err.Error())
+	}
+
+	if rune(res) != exp {
+		t.Fatalf("PeekChar test failed. Expected %s but received %s", string(exp), string(rune(res)))
+	}
+
+}
+
+func TestPeekCharFail(t *testing.T) {
+	s := State{
+		"abcd",
+		4,
+	}
+
+	res, err := s.PeekChar()
+
+	if err == nil {
+		t.Fatalf("PeekChar test failed. Expected error but received %s", string(rune(res)))
+	}
+}
+
 func TestCharParserPass(t *testing.T) {
 	c := byte('c')
-	charParser := charParser(c)
-	curState := state{
+	CharParser := CharParser(c)
+	curState := State{
 		"chillin",
 		0,
 	}
 
-	res, err := charParser(curState)
+	res, err := CharParser(curState)
 
-	exp := result{
+	exp := NewResult(
 		"c",
-		state{
+		State{
 			"chillin",
-			1,	
+			1,
 		},
-	}
+	)
 
 	if err != nil {
-		t.Fatalf("char parsing test failed. Expected %v got err", exp)
+		t.Fatalf("char parsing test failed. Expected %v got the following error:\n %s", exp, err.Error())
 	}
 
 	if !reflect.DeepEqual(exp, res) {
@@ -35,15 +120,18 @@ func TestCharParserPass(t *testing.T) {
 
 func TestCharParserFail(t *testing.T) {
 	c := byte('d')
-	charParser := charParser(c)
-	curState := state{
+	CharParser := CharParser(c)
+	curState := State{
 		"chillin",
 		0,
 	}
 
-	res, err := charParser(curState)
+	res, err := CharParser(curState)
 
-	exp := result{}
+	exp := NewResult(
+		nil,
+		curState,
+	)
 
 	if err == nil {
 		t.Fatalf("char parsing test failed. Expected err got %v", exp)
@@ -57,23 +145,23 @@ func TestCharParserFail(t *testing.T) {
 func TestOrCombinatorPass(t *testing.T) {
 	t1 := byte('c')
 	t2 := byte('1')
-	curState := state{
+	curState := State{
 		"c23",
 		0,
 	}
-	charOrDigit := Or(charParser(t1), charParser(t2))
+	charOrDigit := Or(CharParser(t1), CharParser(t2))
 	res, err := charOrDigit(curState)
 
-	exp := result{
+	exp := NewResult(
 		"c",
-		state{
-			"c23", 
+		State{
+			"c23",
 			1,
 		},
-	}
-	
+	)
+
 	if err != nil {
-		t.Fatalf("Or combinator test failed. Expected %v got error.", exp)
+		t.Fatalf("Or combinator test failed. Expected %v got the following error:\n %s.", exp, err.Error())
 	}
 
 	if !reflect.DeepEqual(exp, res) {
@@ -84,15 +172,18 @@ func TestOrCombinatorPass(t *testing.T) {
 func TestOrCombinatorFail(t *testing.T) {
 	t1 := byte('c')
 	t2 := byte('1')
-	curState := state{
+	curState := State{
 		"d23",
 		0,
 	}
-	charOrDigit := Or(charParser(t1), charParser(t2))
+	charOrDigit := Or(CharParser(t1), CharParser(t2))
 	res, err := charOrDigit(curState)
 
-	exp := result{}
-	
+	exp := NewResult(
+		nil,
+		curState,
+	)
+
 	if err == nil {
 		t.Fatalf("Or combinator test failed. Expected error got %v.", exp)
 	}
@@ -105,26 +196,26 @@ func TestOrCombinatorFail(t *testing.T) {
 func TestAndCombinatorPass(t *testing.T) {
 	t1 := byte('c')
 	t2 := byte('1')
-	curState := state{
+	curState := State{
 		"c13",
 		0,
 	}
-	charAndDigit := And(charParser(t1), charParser(t2))
+	charAndDigit := And(CharParser(t1), CharParser(t2))
 	res, err := charAndDigit(curState)
 
-	// This is a work-around for the DeepEqual function because, 
+	// This is a work-around for the DeepEqual function because,
 	// somehow, the array I initialised wasn't interned (string interning)
 	// and the string pointers were different and they weren't deeply equal :<
-	exp := result{
-		res.parsedResult, 
-		state{
-			"c13", 
+	exp := NewResult(
+		res.parsedResult,
+		State{
+			"c13",
 			2,
 		},
-	}
-	
+	)
+
 	if err != nil {
-		t.Fatalf("Or combinator test failed. Expected %v got error.", exp)
+		t.Fatalf("Or combinator test failed. Expected %v got the following error:\n %s.", exp, err.Error())
 	}
 
 	if !reflect.DeepEqual(exp, res) {
@@ -135,18 +226,18 @@ func TestAndCombinatorPass(t *testing.T) {
 func TestAndCombinatorFail(t *testing.T) {
 	t1 := byte('c')
 	t2 := byte('1')
-	curState := state{
+	curState := State{
 		"d23",
 		0,
 	}
-	charAndDigit := And(charParser(t1), charParser(t2))
+	charAndDigit := And(CharParser(t1), CharParser(t2))
 	res, err := charAndDigit(curState)
 
-	// This is a work-around for the DeepEqual function because, 
-	// somehow, the array I initialised wasn't interned (string interning)
-	// and the string pointers were different and they weren't deeply equal :<
-	exp := result{}
-	
+	exp := NewResult(
+		nil,
+		curState,
+	)
+
 	if err == nil {
 		t.Fatalf("Or combinator test failed. Expected %v got error.", exp)
 	}
@@ -157,11 +248,11 @@ func TestAndCombinatorFail(t *testing.T) {
 }
 
 func TestMapCombinatorPass(t *testing.T) {
-	ch := charParser('1')
-	mapfunc := func(ch string) string{
+	ch := CharParser('1')
+	mapfunc := func(ch string) string {
 		return fmt.Sprintf("Mapped (%s)", ch)
 	}
-	curState := state{
+	curState := State{
 		"123",
 		0,
 	}
@@ -169,16 +260,16 @@ func TestMapCombinatorPass(t *testing.T) {
 	mapcomb := Map(ch, mapfunc)
 	res, err := mapcomb(curState)
 
-	exp := result{
+	exp := NewResult(
 		"Mapped (1)",
-		state{
+		State{
 			"123",
 			1,
 		},
-	}
+	)
 
 	if err != nil {
-		t.Fatalf("Map test failed. Expected %v but received %v and error", exp, res)
+		t.Fatalf("Map test failed. Expected %v but received %v and the following error:\n %s", exp, res, err.Error())
 	}
 
 	if !reflect.DeepEqual(exp, res) {
@@ -187,11 +278,11 @@ func TestMapCombinatorPass(t *testing.T) {
 }
 
 func TestMapCombinatorFail(t *testing.T) {
-	ch := charParser('2')
-	mapfunc := func(ch string) string{
+	ch := CharParser('2')
+	mapfunc := func(ch string) string {
 		return fmt.Sprintf("Mapped (%s)", ch)
 	}
-	curState := state{
+	curState := State{
 		"123",
 		0,
 	}
@@ -199,10 +290,13 @@ func TestMapCombinatorFail(t *testing.T) {
 	mapcomb := Map(ch, mapfunc)
 	res, err := mapcomb(curState)
 
-	exp := result{}
+	exp := NewResult(
+		nil,
+		curState,
+	)
 
 	if err == nil {
-		t.Fatalf("Map test failed. Expected %v but received %v and error", exp, res)
+		t.Fatalf("Map test failed. Expected error but received %v", exp)
 	}
 
 	if !reflect.DeepEqual(exp, res) {
@@ -211,9 +305,9 @@ func TestMapCombinatorFail(t *testing.T) {
 }
 
 func TestMany0CombinatorPass(t *testing.T) {
-	ch := charParser('d')
+	ch := CharParser('d')
 	m0 := Many0(ch)
-	curState := state{
+	curState := State{
 		"dddd",
 		0,
 	}
@@ -221,78 +315,215 @@ func TestMany0CombinatorPass(t *testing.T) {
 	_, err := m0(curState)
 
 	// TODO: Find an alternative to reflect.DeepEqual()!!!
-	exp := result{
+	exp := NewResult(
 		[]string{"d", "d", "d", "d"},
-		state{
+		State{
 			"dddd",
 			4,
 		},
-	}
-	if err != nil{
-		t.Fatalf("Many0 combinator test failed. Expected %v but got error.", exp)
+	)
+
+	if err != nil {
+		t.Fatalf("Many0 combinator test failed. Expected %v but got the following error:\n %s.", exp, err.Error())
 	}
 }
 
 func TestMany1CombinatorPass(t *testing.T) {
-	ch := charParser('d')
+	ch := CharParser('d')
 	m1 := Many1(ch)
-	curState := state{
+	curState := State{
 		"dddd",
 		0,
 	}
 
 	_, err := m1(curState)
 
-	exp := result{
+	exp := NewResult(
 		[]string{"d", "d", "d", "d"},
-		state{
+		State{
 			"dddd",
 			4,
 		},
-	}
-	if err != nil{
-		t.Fatalf("Many0 combinator test failed. Expected %v but got error.", exp)
+	)
+
+	if err != nil {
+		t.Fatalf("Many0 combinator test failed. Expected %v but got the following error:\n %s.", exp, err.Error())
 	}
 }
 
 func TestMany1CombinatorFail(t *testing.T) {
-	ch := charParser('c')
+	ch := CharParser('c')
 	m1 := Many1(ch)
-	curState := state{
+	curState := State{
 		"dddd",
 		0,
 	}
 
 	_, err := m1(curState)
 
-	exp := result{}
+	exp := NewResult(
+		nil,
+		curState,
+	)
 
-	if err == nil{
-		t.Fatalf("Many0 combinator test failed. Expected %v but got error.", exp)
+	if err == nil {
+		t.Fatalf("Many0 combinator test failed. Expected error but got %v.", exp)
 	}
 }
 
 func TestSeqCombinatorPass(t *testing.T) {
 	seq := Seq(
-		charParser('h'),
-		charParser('i'),
-		Many0(charParser('!')),
+		CharParser('h'),
+		CharParser('i'),
+		Many0(CharParser('!')),
 	)
 
-	curState := state{
+	curState := State{
 		"hi!!?",
 		0,
 	}
 	res, err := seq(curState)
 
-	exp := result{
+	exp := NewResult(
 		[]string{"h", "i", "!", "!"},
-		state{
+		State{
 			"hi!!?",
 			3,
 		},
-	}
+	)
+
 	if err != nil {
-		t.Fatalf("seq combinator test failed. expected %v but received %v and error.", exp, res)
+		t.Fatalf("Seq combinator test failed. expected %v but received %v and the following error:\n %s", exp, res, err.Error())
+	}
+}
+
+func TestOptionalCombinatorPass(t *testing.T) {
+	q := CharParser('?')
+	op := Optional(q)
+	curState := State{
+		"?!!!",
+		0,
+	}
+
+	_, err := op(curState)
+
+	exp := State{
+		"?!!!",
+		1,
+	}
+
+	if err != nil {
+		t.Fatalf("Optional Combinator test failed. Expected %v but got the following error:\n %s.", exp, err.Error())
+	}
+}
+
+func TestBetweenCombinatorPass(t *testing.T) {
+	opening := CharParser('{')
+	closing := CharParser('}')
+	ab := Many0(Or(CharParser('a'), CharParser('b')))
+	op := Between(opening, ab, closing)
+	curState := State{
+		"{abba}",
+		0,
+	}
+	_, err := op(curState)
+
+	exp := NewResult(
+		[]string{"a", "b", "b", "a"},
+		State{
+			"{abba}",
+			6,
+		},
+	)
+
+	if err != nil {
+		t.Fatalf("Between Combinator test failed. Expected %v but got the following error:\n %s.", exp, err.Error())
+	}
+}
+
+func TestBetweenCombinatorFail(t *testing.T) {
+	opening := CharParser('{')
+	closing := CharParser('}')
+	ab := Many0(Or(CharParser('a'), CharParser('b')))
+	op := Between(opening, ab, closing)
+	curState := State{
+		"{abba",
+		0,
+	}
+	_, err := op(curState)
+
+	exp := NewResult(
+		nil,
+		curState,
+	)
+
+	if err == nil {
+		t.Fatalf("Between Combinator test failed. Expected error but got %v.", exp)
+	}
+
+}
+
+func TestLazyCombinatorPass(t *testing.T) {
+	var expr Parser
+	expr = Lazy(func() Parser {
+		return Or(
+			CharParser('a'),
+			Seq(
+				CharParser('('),
+				expr,
+				CharParser(')'),
+			),
+		)
+	})
+
+	curState := State{
+		"a(a(a))",
+		0,
+	}
+
+	_, err := expr(curState)
+	exp := NewResult(
+		[]string{"a", "(", "a", "(", "a", ")", ")"},
+		State{
+			"a(a(a))",
+			7,
+		},
+	)
+
+	if err != nil {
+		t.Fatalf("Lazy Combinator test failed. Expected %v but got the following error:\n %s.", exp, err.Error())
+	}
+}
+
+func TestLazyCombinatorFail(t *testing.T) {
+	var expr Parser
+	expr = Lazy(func() Parser {
+		return Or(
+			CharParser('a'),
+			Seq(
+				CharParser('('),
+				expr, // Recursive reference
+				CharParser(')'),
+			),
+		)
+	})
+
+	curState := State{
+		"(a(a)",
+		0,
+	}
+
+	res, err := expr(curState)
+	exp := NewResult(
+		nil,
+		curState,
+	)
+
+	if err == nil {
+		t.Fatalf("Lazy Combinator test failed. Expected error but received %v.", res)
+	}
+
+	if !reflect.DeepEqual(exp, res) {
+		t.Fatalf("Lazy Combinator test failed. Expected %v but received %v.", exp, res)
 	}
 }
