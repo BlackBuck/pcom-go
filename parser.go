@@ -58,9 +58,6 @@ func (s State) PeekChar() (byte, error) {
 	}
 
 	res := s.input[s.offset]
-
-	s = s.Advance(1)
-
 	return res, nil
 }
 
