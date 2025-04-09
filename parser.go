@@ -183,7 +183,7 @@ func Map[A, B any](p Parser, mapping func(A) B) Parser {
 
 // @param p -> Parser
 // @returns Parser
-// It checks for the presence of zero or more occurences of the parser in the input
+// It checks for the presence of zero or more occurrences of the parser in the input
 func Many0(p Parser) Parser {
 	return func(curState State) (Result, error) {
 		var res []interface{}
@@ -208,7 +208,7 @@ func Many0(p Parser) Parser {
 
 // @param p -> Parser.
 // @returns Parser.
-// It checks for the presence of one or more occurence of the parser in the input.
+// It checks for the presence of one or more occurrence of the parser in the input.
 func Many1(p Parser) Parser {
 	return func(curState State) (Result, error) {
 		var res []interface{}
@@ -267,7 +267,7 @@ func Seq(parsers ...Parser) Parser {
 
 // @params p -> Parser.
 // @returns Parser.
-// It checks for the presence of zero or one occurence of the parser in the input.
+// It checks for the presence of zero or one occurrence of the parser in the input.
 func Optional(p Parser) Parser {
 	return func(curState State) (Result, error) {
 		res, err := p(curState)
