@@ -45,7 +45,7 @@ func (s State) Consume(n int) (string, error) {
 		return "", fmt.Errorf("not sufficient characters available for parsing")
 	}
 
-	res := s.input[s.offset:s.offset+n]
+	res := s.input[s.offset : s.offset+n]
 	s = s.Advance(n)
 
 	return res, nil
@@ -192,7 +192,7 @@ func Many0(p Parser) Parser {
 			if err != nil {
 				return NewResult(
 					res,
-					curState, 
+					curState,
 				), nil
 			}
 			res = append(res, x.parsedResult)
@@ -310,7 +310,7 @@ func Between(open, content, close Parser) Parser {
 		closeRes, err := close(contentRes.nextState)
 		if err != nil {
 			return NewResult(
-				nil, 
+				nil,
 				curState,
 			), err
 		}
@@ -330,7 +330,7 @@ func Lazy(f func() Parser) Parser {
 	return func(curState State) (Result, error) {
 		if memo == nil {
 			memo = f()
-		} 
+		}
 		return memo(curState)
 	}
 }
