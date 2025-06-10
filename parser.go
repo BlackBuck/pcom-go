@@ -1,12 +1,15 @@
 package parser
 
 import (
+	"fmt"
 	"unicode/utf8"
 )
 
 type State struct {
 	Input string		
-	CurrentPos Position  // current position
+	offset int
+	line   int
+	column int
 }
 
 type Span struct {
@@ -26,7 +29,10 @@ type Position struct {
 	Column int // column numbers - 1-indexed
 }
 
-type Parser[T any] func(state *State) (result Result[T]) 
+type Parser[T any] struct {
+	Run func(state State) (result Result[T], error Error)
+	Label string
+} 
 
 // TODO: change this as well
 func NewResult[T any](value T, nextState State, span Span) Result[T] {
@@ -34,7 +40,7 @@ func NewResult[T any](value T, nextState State, span Span) Result[T] {
 }
 
 func NewState(input string, position Position) State {
-	return State{input, position}
+	return State{input, position.Offset, position.Line, position.Column}
 }
 
 func (s *State) InBounds(offset int) bool {
@@ -84,6 +90,10 @@ func (s *State) updateColumn(n int) {
 	s.Position().Column += n
 }
 
+func (s *State) udpateOffset(n int) {
+	s.Position().Offset += n
+}
+
 func (s *State) progressLine() {
 	// CR|LF 
 	if isCRLF(s) {
@@ -103,17 +113,108 @@ func isCRLF(s *State) bool {
 }
 
 func (s *State) Position() *Position {
-	return &s.CurrentPos
+	return &Position{
+		Offset: s.offset,
+		Line: s.line,
+		Column: s.column,
+	}
 }
 
-//TODO: Finish building this
-// func CharParser(c byte) Parser[byte] {
-// 	return func(curState State) (Result[byte], Error) {
-// 		if curState.Position.Offset >= len(curState.Input) {
-// 			return NewResult(
-// 				nil,
-// 				curState,
-// 			)
-// 		}
-// 	}
-// }
+func (s *State) Advance(n int) {
+	i := 0
+	for i < n {
+		if isNewLineChar(rune(s.Input[i])) {
+			s.progressLine()
+		} else {
+			s.updateColumn(1)
+		}
+	}
+	s.udpateOffset(n)
+}
+
+// parser a single rune	
+func RuneParser(c rune) Parser[rune] {
+	return Parser[rune]{
+		Run: func(curState State) (Result[rune], Error) {
+		if !curState.InBounds(curState.Position().Offset) {
+			return NewResult[rune](
+				0,
+				curState,
+				Span{
+					*curState.Position(),
+					*curState.Position(),
+				}), Error{
+					Message: "Reached the end of file while parsing",
+					Expected: []string{"char"},
+					Got: "EOF",
+					Position: *curState.Position(),
+				}
+		}
+
+		prev := curState.Position()
+		curState.Advance(1)
+		return NewResult(
+			c,
+			curState,
+			Span{
+				Start: *prev,
+				End: *curState.Position(),
+			}), Error{}
+		
+	},
+	Label: fmt.Sprintf("the character %s", c),
+	}
+}
+
+func StringParser(s string) Parser[string] {
+	return Parser[string]{
+		Run: func(curState State) (Result[string], Error) {
+		if !curState.InBounds(curState.Position().Offset + len(s)) {
+			return NewResult(
+				"",
+				curState,
+				Span{
+					*curState.Position(),
+					*curState.Position(),
+				}), Error{
+					Message: "Reached the end of file while parsing",
+					Expected: []string{"string"},
+					Got: "EOF",
+					Position: *curState.Position(),
+				}
+		}
+
+		if curState.Input[curState.Position().Offset:curState.Position().Offset+len(s)] != s {
+			// TODO: check which is better, passing the state (all state functions without pointer) 
+			// or updating the state in-place (all state functions with a pointer)
+			t := curState
+			t.Advance(len(s))
+			return NewResult[string](
+				"",
+				curState,
+				Span{
+					*curState.Position(),
+					*t.Position(),
+				}), Error{
+					Message: "Strings do not match.",
+					Expected: []string{s},
+					Got: curState.Input[curState.Position().Offset:curState.Position().Offset+len(s)],
+					Position: *curState.Position(),
+				}
+		}
+
+		prev := curState.Position()
+		curState.Advance(1)
+		return NewResult(
+			s,
+			curState,
+			Span{
+				Start: *prev,
+				End: *curState.Position(),
+			}), Error{}
+		
+	},
+	Label: fmt.Sprintf("The string <%s>", s),
+	}
+}
+
