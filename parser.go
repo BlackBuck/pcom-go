@@ -2,335 +2,219 @@ package parser
 
 import (
 	"fmt"
+	"unicode/utf8"
 )
 
-// State defines the State of the current parsing logic.
-// input is the input string.
-// offset is used to determine the position at which the next parser will start parsing.
 type State struct {
-	input  string
+	Input string		
 	offset int
+	line   int
+	column int
 }
 
-// Result struct will be returned by all parsers alongside an error (if present).
-// parsedResult is the parsed Result of the parser.
-// parsedResult should've (ideally) been a generic type, but that would create unnecessary overhead.
-// nextState is the State after the current parser is done parsing the input.
-type Result struct {
-	parsedResult interface{}
-	nextState    State
+type Span struct {
+	Start Position
+	End Position
 }
 
-// constructor for Result
-func NewResult(parsedResult interface{}, nextState State) Result {
-	return Result{parsedResult, nextState}
+type Result[T any] struct {
+	Value T
+	NextState State
+	Span Span
+	Error *Error
+}
+type Position struct {
+	Offset int // byte offset	
+	Line int // line numbers - 1-indexed
+	Column int // column numbers - 1-indexed
 }
 
-// constructor for State
-func NewState(input string, offset int) State {
-	return State{input, offset}
+type Parser[T any] struct {
+	Run func(state State) (result Result[T], error Error)
+	Label string
+} 
+
+// TODO: change this as well
+func NewResult[T any](value T, nextState State, span Span) Result[T] {
+	return Result[T]{value, nextState, span, nil}
 }
 
-// The Parser type should've(ideally) been a struct, but with generic types it created a LOT of overhead.
-type Parser func(curState State) (Result, error)
-
-// Check if there are characters available for parsing
-func (s State) HasAvailableChars(n int) bool {
-	return s.offset < (len(s.input) - n + 1)
+func NewState(input string, position Position) State {
+	return State{input, position.Offset, position.Line, position.Column}
 }
 
-// Consume one character and return
-func (s State) Consume(n int) (string, error) {
-	if !s.HasAvailableChars(n) {
-		return "", fmt.Errorf("not sufficient characters available for parsing")
-	}
-
-	res := s.input[s.offset : s.offset+n]
-	s = s.Advance(n)
-
-	return res, nil
+func (s *State) InBounds(offset int) bool {
+	return offset < len(s.Input)
+}
+func (s *State) HasAvailableChars(n int) bool {
+	return s.Position().Offset < len(s.Input) - n + 1
 }
 
-// Peek one char -- consume without advancing
-func (s State) PeekChar() (byte, error) {
-	if !s.HasAvailableChars(1) {
-		return 0, fmt.Errorf("not sufficient characters available for parsing")
-	}
-
-	res := s.input[s.offset]
-	return res, nil
+func isNewLineChar(c rune) bool {
+	return c == '\r' || c == '\n'
 }
 
-// Advance n places
-func (s State) Advance(n int) State {
-	return State{
-		s.input,
-		s.offset + n,
-	}
-}
+func (s *State) Consume(n int) (string, Span, bool) {
+	startPos := s.Position()
 
-// basic char parser
-func CharParser(c byte) Parser {
-	return func(curState State) (Result, error) {
-		if curState.offset >= len(curState.input) {
-			return NewResult(
-				nil,
-				curState,
-			), fmt.Errorf("reached the end of input string while parsing")
+	start := startPos.Offset
+	end := start
+	consumed := 0
+
+	for consumed < n && s.InBounds(end) {
+		r, size := utf8.DecodeRuneInString(s.Input[end:])
+		
+		if r == utf8.RuneError && size == 1 {
+			return "", Span{}, false
 		}
 
-		if curState.input[curState.offset] != c {
-			return NewResult(
-				nil,
-				curState,
-			), fmt.Errorf("expected %c but received %c", c, curState.input[curState.offset])
+		if isNewLineChar(r) {
+			s.progressLine()
+		} else {
+			s.updateColumn(1)
 		}
 
+		consumed += 1
+		end += size
+	}
+
+	if consumed < n {
+		return "", Span{}, false
+	}
+
+	return s.Input[start:end], Span{*startPos, *s.Position()}, true
+}
+
+
+func (s *State) updateColumn(n int) {
+	s.Position().Column += n
+}
+
+func (s *State) udpateOffset(n int) {
+	s.Position().Offset += n
+}
+
+func (s *State) progressLine() {
+	// CR|LF 
+	if isCRLF(s) {
+		s.Position().Offset += 2
+	} else {
+		s.Position().Offset += 1
+	}
+	s.Position().Line += 1
+	s.Position().Column = 1
+}
+
+func isCRLF(s *State) bool {
+	if s.Input[s.Position().Offset] == '\r' && (len(s.Input) > s.Position().Offset + 1 && s.Input[s.Position().Offset+1] == '\n') {
+		return true
+	}
+	return false
+}
+
+func (s *State) Position() *Position {
+	return &Position{
+		Offset: s.offset,
+		Line: s.line,
+		Column: s.column,
+	}
+}
+
+func (s *State) Advance(n int) {
+	i := 0
+	for i < n {
+		if isNewLineChar(rune(s.Input[i])) {
+			s.progressLine()
+		} else {
+			s.updateColumn(1)
+		}
+	}
+	s.udpateOffset(n)
+}
+
+// parser a single rune	
+func RuneParser(c rune) Parser[rune] {
+	return Parser[rune]{
+		Run: func(curState State) (Result[rune], Error) {
+		if !curState.InBounds(curState.Position().Offset) {
+			return NewResult[rune](
+				0,
+				curState,
+				Span{
+					*curState.Position(),
+					*curState.Position(),
+				}), Error{
+					Message: "Reached the end of file while parsing",
+					Expected: []string{"char"},
+					Got: "EOF",
+					Position: *curState.Position(),
+				}
+		}
+
+		prev := curState.Position()
+		curState.Advance(1)
 		return NewResult(
-			string(c),
-			curState.Advance(1),
-		), nil
+			c,
+			curState,
+			Span{
+				Start: *prev,
+				End: *curState.Position(),
+			}), Error{}
+		
+	},
+	Label: fmt.Sprintf("the character %s", c),
 	}
 }
 
-// @params s (string).
-// It parses a string exactly and advances the current State.
-func String(s string) Parser {
-	return func(curState State) (Result, error) {
-		if curState.input[curState.offset:] != s {
+func StringParser(s string) Parser[string] {
+	return Parser[string]{
+		Run: func(curState State) (Result[string], Error) {
+		if !curState.InBounds(curState.Position().Offset + len(s)) {
 			return NewResult(
-				nil,
+				"",
 				curState,
-			), fmt.Errorf("expected %s", s)
+				Span{
+					*curState.Position(),
+					*curState.Position(),
+				}), Error{
+					Message: "Reached the end of file while parsing",
+					Expected: []string{"string"},
+					Got: "EOF",
+					Position: *curState.Position(),
+				}
 		}
 
+		if curState.Input[curState.Position().Offset:curState.Position().Offset+len(s)] != s {
+			// TODO: check which is better, passing the state (all state functions without pointer) 
+			// or updating the state in-place (all state functions with a pointer)
+			t := curState
+			t.Advance(len(s))
+			return NewResult[string](
+				"",
+				curState,
+				Span{
+					*curState.Position(),
+					*t.Position(),
+				}), Error{
+					Message: "Strings do not match.",
+					Expected: []string{s},
+					Got: curState.Input[curState.Position().Offset:curState.Position().Offset+len(s)],
+					Position: *curState.Position(),
+				}
+		}
+
+		prev := curState.Position()
+		curState.Advance(1)
 		return NewResult(
 			s,
-			curState.Advance(len(s)),
-		), nil
-	}
-}
-
-// An OR combinator.
-// @params left, right are Parsers.
-// @returns Parser.
-// performs a logical OR operation between the left and right parsers.
-func Or(left Parser, right Parser) Parser {
-	return func(curState State) (Result, error) {
-		leftRes, err := left(curState)
-		if err != nil {
-			curState = leftRes.nextState
-			return right(curState)
-		}
-		return leftRes, nil
-	}
-}
-
-// An AND combinator.
-// @params left, right are Parsers.
-// @returns Parser.
-// performs a logical AND operation between the left and right parsers.
-func And(left Parser, right Parser) Parser {
-	return func(curState State) (Result, error) {
-		leftRes, err := left(curState)
-		if err != nil {
-			return NewResult(
-				nil,
-				curState,
-			), fmt.Errorf("err in parsing \"and\"")
-		}
-
-		// Don't assign leftRes.nextState directly to curState
-		// because if right parser Results in an error, we
-		// won't have anything for fallback
-		next := leftRes.nextState
-		rightRes, err := right(next)
-		if err != nil {
-			return NewResult(
-				nil,
-				curState,
-			), fmt.Errorf("err in parsing \"and\"")
-		}
-
-		return NewResult(
-			[]interface{}{leftRes.parsedResult, rightRes.parsedResult},
-			rightRes.nextState,
-		), nil
-	}
-}
-
-// @param p -> Parser.
-// @param mapping -> A function.
-// @returns Parser.
-// It maps the output of the parser(p) through the mappping func.
-func Map[A, B any](p Parser, mapping func(A) B) Parser {
-	return func(curState State) (Result, error) {
-		res, err := p(curState)
-
-		if err != nil {
-			return NewResult(
-				nil,
-				curState,
-			), err
-		}
-
-		return NewResult(
-			mapping(res.parsedResult.(A)),
-			res.nextState,
-		), nil
-	}
-}
-
-// @param p -> Parser
-// @returns Parser
-// It checks for the presence of zero or more occurrences of the parser in the input
-func Many0(p Parser) Parser {
-	return func(curState State) (Result, error) {
-		var res []interface{}
-		for curState.offset < len(curState.input) {
-			x, err := p(curState)
-			if err != nil {
-				return NewResult(
-					res,
-					curState,
-				), nil
-			}
-			res = append(res, x.parsedResult)
-			curState = x.nextState
-		}
-
-		return NewResult(
-			res,
 			curState,
-		), nil
+			Span{
+				Start: *prev,
+				End: *curState.Position(),
+			}), Error{}
+		
+	},
+	Label: fmt.Sprintf("The string <%s>", s),
 	}
 }
 
-// @param p -> Parser.
-// @returns Parser.
-// It checks for the presence of one or more occurrence of the parser in the input.
-func Many1(p Parser) Parser {
-	return func(curState State) (Result, error) {
-		var res []interface{}
-		for curState.offset < len(curState.input) {
-			x, err := p(curState)
-			if err != nil {
-				if len(res) == 0 {
-					return NewResult(
-						nil,
-						curState,
-					), err
-				}
-
-				return NewResult(
-					res,
-					x.nextState,
-				), nil
-			}
-			res = append(res, x.parsedResult)
-			curState = x.nextState
-		}
-
-		return NewResult(
-			res,
-			curState,
-		), nil
-	}
-}
-
-// @params parsers -> Parser.
-// @returns Parser.
-// It sequentially parses the input.
-// The output of the first parser goes as input for the second and so on.
-func Seq(parsers ...Parser) Parser {
-	return func(curState State) (Result, error) {
-		var res []interface{}
-		next := curState
-		for _, parser := range parsers {
-			x, err := parser(next)
-			if err != nil {
-				return NewResult(
-					nil,
-					curState, // fallback to the initial State
-				), err
-			}
-			res = append(res, x.parsedResult)
-			next = x.nextState
-		}
-
-		return NewResult(
-			res,
-			next,
-		), nil
-	}
-}
-
-// @params p -> Parser.
-// @returns Parser.
-// It checks for the presence of zero or one occurrence of the parser in the input.
-func Optional(p Parser) Parser {
-	return func(curState State) (Result, error) {
-		res, err := p(curState)
-		if err != nil {
-			return NewResult(
-				nil,
-				curState,
-			), nil
-		}
-
-		return NewResult(
-			res.parsedResult,
-			res.nextState,
-		), nil
-	}
-}
-
-// @params open, context, close -> Parser.
-// @returns Parser.
-// It parses only the input that is present between open and close.
-// It then returns the output produced by the context parser.
-func Between(open, content, close Parser) Parser {
-	return func(curState State) (Result, error) {
-		openRes, err := open(curState)
-		if err != nil {
-			return NewResult(
-				nil,
-				curState,
-			), err
-		}
-
-		contentRes, err := content(openRes.nextState)
-		if err != nil {
-			return NewResult(
-				nil,
-				curState,
-			), err
-		}
-
-		closeRes, err := close(contentRes.nextState)
-		if err != nil {
-			return NewResult(
-				nil,
-				curState,
-			), err
-		}
-
-		return NewResult(
-			contentRes.parsedResult,
-			closeRes.nextState,
-		), nil
-	}
-}
-
-// @param f -> function that returns a Parser.
-// @returns Parser.
-// It delays the creation of a parser unless required.
-func Lazy(f func() Parser) Parser {
-	var memo Parser
-	return func(curState State) (Result, error) {
-		if memo == nil {
-			memo = f()
-		}
-		return memo(curState)
-	}
-}
