@@ -210,7 +210,8 @@ func StringParser(s string) Parser[string] {
 		Label: fmt.Sprintf("The string <%s>", s),
 	}
 }
-//TODO: Handle empty arrays for empty Parser[T] arrays as well 
+
+//TODO: Handle empty arrays for empty Parser[T] arrays as well
 
 // the OR combinator
 func Or[T any](parsers ...Parser[T]) Parser[T] {
@@ -330,13 +331,13 @@ func Many1[T any](p Parser[T]) Parser[[]T] {
 
 func Optional[T any](p Parser[T]) Parser[T] {
 	return Parser[T]{
-		Run: func (curState State) (Result[T], Error) {
+		Run: func(curState State) (Result[T], Error) {
 			res, err := p.Run(curState)
 			if err.HasError() {
 				return Result[T]{}, Error{}
 			}
 
-			return res, Error{}	
+			return res, Error{}
 		},
 	}
 }
@@ -347,15 +348,15 @@ func Sequence[T any](parsers []Parser[T]) Parser[T] {
 		label = fmt.Sprintf("<%s> -> <%s>", label, parser.Label)
 	}
 	return Parser[T]{
-		Run: func (curState State) (Result[T], Error) {
+		Run: func(curState State) (Result[T], Error) {
 			var ret Result[T]
 			for _, parser := range parsers {
 				res, err := parser.Run(curState)
 				if err.HasError() {
 					return Result[T]{}, Error{
-						Message: "Sequence parser failed.",
+						Message:  "Sequence parser failed.",
 						Expected: err.Expected,
-						Got: err.Got,
+						Got:      err.Got,
 						Position: *curState.Position(),
 					}
 				}
@@ -373,9 +374,9 @@ func Between[T any](open, content, close Parser[T]) Parser[T] {
 			openRes, err := open.Run(curState)
 			if err.HasError() {
 				return Result[T]{}, Error{
-					Message: "Between parser failed.",	
+					Message:  "Between parser failed.",
 					Expected: open.Label,
-					Got: err.Got,
+					Got:      err.Got,
 					Position: *curState.Position(),
 				}
 			}
@@ -383,9 +384,9 @@ func Between[T any](open, content, close Parser[T]) Parser[T] {
 			contentRes, err := content.Run(openRes.NextState)
 			if err.HasError() {
 				return Result[T]{}, Error{
-					Message: "Between parser failed.",	
+					Message:  "Between parser failed.",
 					Expected: content.Label,
-					Got: err.Got,
+					Got:      err.Got,
 					Position: *curState.Position(),
 				}
 			}
@@ -393,9 +394,9 @@ func Between[T any](open, content, close Parser[T]) Parser[T] {
 			closeRes, err := close.Run(contentRes.NextState)
 			if err.HasError() {
 				return Result[T]{}, Error{
-					Message: "Between parser failed.",	
+					Message:  "Between parser failed.",
 					Expected: close.Label,
-					Got: err.Got,
+					Got:      err.Got,
 					Position: *curState.Position(),
 				}
 			}
