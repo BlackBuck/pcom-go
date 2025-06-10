@@ -32,7 +32,17 @@ type Position struct {
 type Parser[T any] struct {
 	Run func(state State) (result Result[T], error Error)
 	Label string
-} 
+}
+
+func (p *Parser[T]) Check(curState State) (result Result[T], error Error) {
+	curPos := curState.Position()
+	res, err := p.Run(curState)
+	if err.HasError() {
+		return Result[T]{}, err
+	}
+	curState.UpdatePosition(*curPos)
+	return res, Error{}	
+}
 
 // TODO: change this as well
 func NewResult[T any](value T, nextState State, span Span) Result[T] {
@@ -85,6 +95,11 @@ func (s *State) Consume(n int) (string, Span, bool) {
 	return s.Input[start:end], Span{*startPos, *s.Position()}, true
 }
 
+func (s *State) UpdatePosition(pos Position) {
+	s.offset = pos.Offset	
+	s.column = pos.Column
+	s.line = pos.Line
+}
 
 func (s *State) updateColumn(n int) {
 	s.Position().Column += n
@@ -137,32 +152,33 @@ func RuneParser(c rune) Parser[rune] {
 	return Parser[rune]{
 		Run: func(curState State) (Result[rune], Error) {
 		if !curState.InBounds(curState.Position().Offset) {
-			return NewResult[rune](
-				0,
-				curState,
-				Span{
-					*curState.Position(),
-					*curState.Position(),
-				}), Error{
+			return Result[rune]{}, Error{
 					Message: "Reached the end of file while parsing",
-					Expected: []string{"char"},
+					Expected: string(c),
 					Got: "EOF",
 					Position: *curState.Position(),
 				}
 		}
-
-		prev := curState.Position()
-		curState.Advance(1)
-		return NewResult(
-			c,
-			curState,
-			Span{
-				Start: *prev,
-				End: *curState.Position(),
-			}), Error{}
+		if curState.Input[curState.Position().Offset] == byte(c) {
+			prev := curState.Position()
+			curState.Advance(1)
+			return NewResult(
+				c,
+				curState,
+				Span{
+					Start: *prev,
+					End: *curState.Position(),
+				}), Error{}
+		}
 		
+		return Result[rune]{}, Error{
+					Message: "Reached the end of file while parsing",
+					Expected: string(c),
+					Got: string(curState.Input[curState.Position().Offset]),
+					Position: *curState.Position(),
+				}
 	},
-	Label: fmt.Sprintf("the character %s", c),
+	Label: fmt.Sprintf("the character <%s>", string(c)),
 	}
 }
 
@@ -170,15 +186,9 @@ func StringParser(s string) Parser[string] {
 	return Parser[string]{
 		Run: func(curState State) (Result[string], Error) {
 		if !curState.InBounds(curState.Position().Offset + len(s)) {
-			return NewResult(
-				"",
-				curState,
-				Span{
-					*curState.Position(),
-					*curState.Position(),
-				}), Error{
+			return Result[string]{}, Error{
 					Message: "Reached the end of file while parsing",
-					Expected: []string{"string"},
+					Expected: s,
 					Got: "EOF",
 					Position: *curState.Position(),
 				}
@@ -189,15 +199,9 @@ func StringParser(s string) Parser[string] {
 			// or updating the state in-place (all state functions with a pointer)
 			t := curState
 			t.Advance(len(s))
-			return NewResult[string](
-				"",
-				curState,
-				Span{
-					*curState.Position(),
-					*t.Position(),
-				}), Error{
+			return Result[string]{}, Error{
 					Message: "Strings do not match.",
-					Expected: []string{s},
+					Expected: s,
 					Got: curState.Input[curState.Position().Offset:curState.Position().Offset+len(s)],
 					Position: *curState.Position(),
 				}
@@ -217,4 +221,60 @@ func StringParser(s string) Parser[string] {
 	Label: fmt.Sprintf("The string <%s>", s),
 	}
 }
+
+// the OR combinator
+func Or[T any](parsers []Parser[T]) Parser[T] {
+	label := parsers[0].Label
+	for _, parser := range parsers {
+		label = fmt.Sprintf("%s, %s", label, parser.Label)
+	}
+	return Parser[T]{
+		Run: func (curState State) (Result[T], Error) {
+			var lastErr Error
+			for _, parser := range parsers {
+				res, err := parser.Check(curState) // sends a copy
+				if !err.HasError() {
+					return res, Error{}
+				}
+				lastErr = err
+			}
+
+			return Result[T]{}, Error{
+				Message: "Or combinator failed",
+				Expected: lastErr.Expected,
+				Got: lastErr.Got,
+				Position: lastErr.Position,
+			}
+		},
+		Label: label,
+	}
+}
+
+func And[T any](parsers []Parser[T]) Parser[T] {
+	label := parsers[0].Label
+	for _, parser := range parsers {
+		label = fmt.Sprintf("%s, %s", label, parser.Label)
+	}
+	return Parser[T]{
+		Run: func (curState State) (Result[T], Error) {
+			var lastRes Result[T]
+			for _, parser := range parsers {
+				res, err := parser.Check(curState) // sends a copy
+				if err.HasError() {
+					return Result[T]{}, Error{
+						Message: "And combinator failed.",
+						Expected: err.Expected,
+						Got: err.Got,
+						Position: err.Position,
+					}
+				}
+				lastRes = res
+			}
+
+			return lastRes, Error{}
+		},
+		Label: label,
+	}
+}
+
 
