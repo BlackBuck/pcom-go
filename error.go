@@ -1,9 +1,9 @@
 package parser
 
 type Error struct {
-	Message string
+	Message  string
 	Expected string
-	Got 	string
+	Got      string
 	Position Position
 }
 
