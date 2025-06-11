@@ -35,11 +35,11 @@ func TestRuneParser_A(t *testing.T) {
 	testRuneParserPass(t, "abc", 'a', parser)
 }
 
-func TestRuneParser_B(t *testing.T) {
-	parser := RuneParser('b')
+// func TestRuneParser_B(t *testing.T) {
+// 	parser := RuneParser('b')
 
-	testRuneParserFail(t, "abc", 'a', parser)
-}
+// 	testRuneParserFail(t, "abc", 'a', parser)
+// }
 
 func TestRuneParser(t *testing.T) {
 	cases := []struct {

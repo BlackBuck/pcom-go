@@ -27,19 +27,17 @@ func NewResult[T any](value T, nextState State, span Span) Result[T] {
 	return Result[T]{value, nextState, span, nil}
 }
 
-func NewState(input string, position Position) State {
-	return State{input, position.Offset, position.Line, position.Column}
-}
-
 // parser a single rune
 func RuneParser(c rune) Parser[rune] {
 	return Parser[rune]{
 		Run: func(curState State) (Result[rune], Error) {
 			if !curState.InBounds(curState.offset) {
+				lastLineStart := curState.LineStartBeforeCurrentOffset()
 				return Result[rune]{}, Error{
 					Message:  "Reached the end of file while parsing",
 					Expected: string(c),
 					Got:      "EOF",
+					Snippet: curState.Input[curState.lineStarts[lastLineStart]:curState.lineStarts[min(len(curState.lineStarts)-1, lastLineStart+1)]],
 					Position: NewPositionFromState(curState),
 				}
 			}
@@ -55,10 +53,12 @@ func RuneParser(c rune) Parser[rune] {
 					}), Error{}
 			}
 
+			lastLineStart := curState.LineStartBeforeCurrentOffset()
 			return Result[rune]{}, Error{
 				Message:  "Reached the end of file while parsing",
 				Expected: string(c),
 				Got:      string(curState.Input[curState.offset]),
+				Snippet: curState.Input[curState.lineStarts[lastLineStart]:curState.lineStarts[min(len(curState.lineStarts)-1, lastLineStart+1)]],
 				Position: NewPositionFromState(curState),
 			}
 		},
@@ -70,10 +70,12 @@ func StringParser(s string) Parser[string] {
 	return Parser[string]{
 		Run: func(curState State) (Result[string], Error) {
 			if !curState.InBounds(curState.offset + len(s)) {
+				lastLineStart := curState.LineStartBeforeCurrentOffset()
 				return Result[string]{}, Error{
 					Message:  "Reached the end of file while parsing",
 					Expected: s,
 					Got:      "EOF",
+					Snippet: curState.Input[curState.lineStarts[lastLineStart]:curState.lineStarts[min(len(curState.lineStarts)-1, lastLineStart+1)]],
 					Position: NewPositionFromState(curState),
 				}
 			}
@@ -81,11 +83,13 @@ func StringParser(s string) Parser[string] {
 			if curState.Input[curState.offset:curState.offset+len(s)] != s {
 				// TODO: Run which is better, passing the state (all state functions without pointer)
 				// or updating the state in-place (all state functions with a pointer)
+				lastLineStart := curState.LineStartBeforeCurrentOffset()
 				t := curState
 				t.Consume(len(s))
 				return Result[string]{}, Error{
 					Message:  "Strings do not match.",
 					Expected: s,
+					Snippet: curState.Input[curState.lineStarts[lastLineStart]:curState.lineStarts[min(len(curState.lineStarts)-1, lastLineStart+1)]],
 					Got:      curState.Input[curState.offset : curState.offset+len(s)],
 					Position: NewPositionFromState(curState),
 				}
@@ -125,10 +129,13 @@ func Or[T any](parsers ...Parser[T]) Parser[T] {
 				lastErr = err
 			}
 
+			lastLineStart := curState.LineStartBeforeCurrentOffset()
+			// furthest error with position
 			return Result[T]{}, Error{
 				Message:  "Or combinator failed",
 				Expected: lastErr.Expected,
 				Got:      lastErr.Got,
+				Snippet: curState.Input[curState.lineStarts[lastLineStart]:curState.lineStarts[min(len(curState.lineStarts)-1, lastLineStart+1)]],
 				Position: lastErr.Position,
 			}
 		},
@@ -147,10 +154,12 @@ func And[T any](parsers ...Parser[T]) Parser[T] {
 			for _, parser := range parsers {
 				res, err := parser.Run(curState) // sends a copy
 				if err.HasError() {
+					lastLineStart := curState.LineStartBeforeCurrentOffset()
 					return Result[T]{}, Error{
 						Message:  "And combinator failed.",
 						Expected: err.Expected,
 						Got:      err.Got,
+						Snippet: curState.Input[curState.lineStarts[lastLineStart]:curState.lineStarts[min(len(curState.lineStarts)-1, lastLineStart+1)]],
 						Position: err.Position,
 					}
 				}
@@ -213,10 +222,12 @@ func Many1[T any](p Parser[T]) Parser[[]T] {
 				}, Error{}
 			}
 
+			lastLineStart := curState.LineStartBeforeCurrentOffset()
 			return Result[[]T]{}, Error{
 				Message:  "Many1 parser failed.",
 				Expected: fmt.Sprintf("<%s> at least once", p.Label),
 				Got:      fmt.Sprintf("<%s> zero times", p.Label),
+				Snippet: curState.Input[curState.lineStarts[lastLineStart]:curState.lineStarts[min(len(curState.lineStarts)-1, lastLineStart+1)]],
 				Position: NewPositionFromState(curState),
 			}
 		},
@@ -248,10 +259,12 @@ func Sequence[T any](parsers []Parser[T]) Parser[T] {
 			for _, parser := range parsers {
 				res, err := parser.Run(curState)
 				if err.HasError() {
+					lastLineStart := curState.LineStartBeforeCurrentOffset()
 					return Result[T]{}, Error{
 						Message:  "Sequence parser failed.",
 						Expected: err.Expected,
 						Got:      err.Got,
+						Snippet: curState.Input[curState.lineStarts[lastLineStart]:curState.lineStarts[min(len(curState.lineStarts)-1, lastLineStart+1)]],
 						Position: NewPositionFromState(curState),
 					}
 				}
@@ -268,30 +281,36 @@ func Between[T any](open, content, close Parser[T]) Parser[T] {
 		Run: func(curState State) (result Result[T], error Error) {
 			openRes, err := open.Run(curState)
 			if err.HasError() {
+				lastLineStart := curState.LineStartBeforeCurrentOffset()
 				return Result[T]{}, Error{
 					Message:  "Between parser failed.",
 					Expected: open.Label,
 					Got:      err.Got,
+					Snippet: curState.Input[curState.lineStarts[lastLineStart]:curState.lineStarts[min(len(curState.lineStarts)-1, lastLineStart+1)]],
 					Position: NewPositionFromState(curState),
 				}
 			}
 
 			contentRes, err := content.Run(openRes.NextState)
 			if err.HasError() {
+				lastLineStart := curState.LineStartBeforeCurrentOffset()
 				return Result[T]{}, Error{
 					Message:  "Between parser failed.",
 					Expected: content.Label,
 					Got:      err.Got,
+					Snippet: curState.Input[curState.lineStarts[lastLineStart]:curState.lineStarts[min(len(curState.lineStarts)-1, lastLineStart+1)]],
 					Position: NewPositionFromState(curState),
 				}
 			}
 
+			lastLineStart := curState.LineStartBeforeCurrentOffset()
 			_, err = close.Run(contentRes.NextState)
 			if err.HasError() {
 				return Result[T]{}, Error{
 					Message:  "Between parser failed.",
 					Expected: close.Label,
 					Got:      err.Got,
+					Snippet: curState.Input[curState.lineStarts[lastLineStart]:curState.lineStarts[min(len(curState.lineStarts)-1, lastLineStart+1)]],
 					Position: NewPositionFromState(curState),
 				}
 			}
