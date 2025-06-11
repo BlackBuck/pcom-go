@@ -32,7 +32,7 @@ type Position struct {
 func NewPositionFromState(s State) Position {
 	return Position{
 		Offset: s.offset,
-		Line: s.line,
+		Line:   s.line,
 		Column: s.column,
 	}
 }
