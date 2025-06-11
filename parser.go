@@ -2,15 +2,8 @@ package parser
 
 import (
 	"fmt"
-	"unicode/utf8"
 )
 
-type State struct {
-	Input  string
-	offset int
-	line   int
-	column int
-}
 
 type Span struct {
 	Start Position
@@ -23,11 +16,7 @@ type Result[T any] struct {
 	Span      Span
 	Error     *Error
 }
-type Position struct {
-	Offset int // byte offset
-	Line   int // line numbers - 1-indexed
-	Column int // column numbers - 1-indexed
-}
+
 
 type Parser[T any] struct {
 	Run   func(state State) (result Result[T], error Error)
@@ -42,129 +31,35 @@ func NewState(input string, position Position) State {
 	return State{input, position.Offset, position.Line, position.Column}
 }
 
-func (s *State) InBounds(offset int) bool {
-	return offset < len(s.Input)
-}
-func (s *State) HasAvailableChars(n int) bool {
-	return s.Position().Offset < len(s.Input)-n+1
-}
-
-func isNewLineChar(c rune) bool {
-	return c == '\r' || c == '\n'
-}
-
-func (s *State) Consume(n int) (string, Span, bool) {
-	startPos := s.Position()
-
-	start := startPos.Offset
-	end := start
-	consumed := 0
-
-	for consumed < n && s.InBounds(end) {
-		r, size := utf8.DecodeRuneInString(s.Input[end:])
-
-		if r == utf8.RuneError && size == 1 {
-			return "", Span{}, false
-		}
-
-		if isNewLineChar(r) {
-			s.progressLine()
-		} else {
-			s.updateColumn(1)
-		}
-
-		consumed += 1
-		end += size
-	}
-
-	if consumed < n {
-		return "", Span{}, false
-	}
-
-	return s.Input[start:end], Span{*startPos, *s.Position()}, true
-}
-
-func (s *State) UpdatePosition(pos Position) {
-	s.offset = pos.Offset
-	s.column = pos.Column
-	s.line = pos.Line
-}
-
-func (s *State) updateColumn(n int) {
-	s.Position().Column += n
-}
-
-func (s *State) udpateOffset(n int) {
-	s.Position().Offset += n
-}
-
-func (s *State) progressLine() {
-	// CR|LF
-	if isCRLF(s) {
-		s.Position().Offset += 2
-	} else {
-		s.Position().Offset += 1
-	}
-	s.Position().Line += 1
-	s.Position().Column = 1
-}
-
-func isCRLF(s *State) bool {
-	if s.Input[s.Position().Offset] == '\r' && (len(s.Input) > s.Position().Offset+1 && s.Input[s.Position().Offset+1] == '\n') {
-		return true
-	}
-	return false
-}
-
-func (s *State) Position() *Position {
-	return &Position{
-		Offset: s.offset,
-		Line:   s.line,
-		Column: s.column,
-	}
-}
-
-func (s *State) Advance(n int) {
-	i := 0
-	for i < n {
-		if isNewLineChar(rune(s.Input[i])) {
-			s.progressLine()
-		} else {
-			s.updateColumn(1)
-		}
-	}
-	s.udpateOffset(n)
-}
-
 // parser a single rune
 func RuneParser(c rune) Parser[rune] {
 	return Parser[rune]{
 		Run: func(curState State) (Result[rune], Error) {
-			if !curState.InBounds(curState.Position().Offset) {
+			if !curState.InBounds(curState.offset) {
 				return Result[rune]{}, Error{
 					Message:  "Reached the end of file while parsing",
 					Expected: string(c),
 					Got:      "EOF",
-					Position: *curState.Position(),
+					Position: NewPositionFromState(curState),
 				}
 			}
-			if curState.Input[curState.Position().Offset] == byte(c) {
-				prev := curState.Position()
-				curState.Advance(1)
+			if curState.Input[curState.offset] == byte(c) {
+				prev := NewPositionFromState(curState)
+				curState.Consume(1)
 				return NewResult(
 					c,
 					curState,
 					Span{
-						Start: *prev,
-						End:   *curState.Position(),
+						Start: prev,
+						End:   NewPositionFromState(curState),
 					}), Error{}
 			}
 
 			return Result[rune]{}, Error{
 				Message:  "Reached the end of file while parsing",
 				Expected: string(c),
-				Got:      string(curState.Input[curState.Position().Offset]),
-				Position: *curState.Position(),
+				Got:      string(curState.Input[curState.offset]),
+				Position: NewPositionFromState(curState),
 			}
 		},
 		Label: fmt.Sprintf("the character <%s>", string(c)),
@@ -174,36 +69,36 @@ func RuneParser(c rune) Parser[rune] {
 func StringParser(s string) Parser[string] {
 	return Parser[string]{
 		Run: func(curState State) (Result[string], Error) {
-			if !curState.InBounds(curState.Position().Offset + len(s)) {
+			if !curState.InBounds(curState.offset + len(s)) {
 				return Result[string]{}, Error{
 					Message:  "Reached the end of file while parsing",
 					Expected: s,
 					Got:      "EOF",
-					Position: *curState.Position(),
+					Position: NewPositionFromState(curState),
 				}
 			}
 
-			if curState.Input[curState.Position().Offset:curState.Position().Offset+len(s)] != s {
+			if curState.Input[curState.offset:curState.offset+len(s)] != s {
 				// TODO: Run which is better, passing the state (all state functions without pointer)
 				// or updating the state in-place (all state functions with a pointer)
 				t := curState
-				t.Advance(len(s))
+				t.Consume(len(s))
 				return Result[string]{}, Error{
 					Message:  "Strings do not match.",
 					Expected: s,
-					Got:      curState.Input[curState.Position().Offset : curState.Position().Offset+len(s)],
-					Position: *curState.Position(),
+					Got:      curState.Input[curState.offset : curState.offset+len(s)],
+					Position: NewPositionFromState(curState),
 				}
 			}
 
-			prev := curState.Position()
-			curState.Advance(1)
+			prev := NewPositionFromState(curState)
+			curState.Consume(len(s))
 			return NewResult(
 				s,
 				curState,
 				Span{
-					Start: *prev,
-					End:   *curState.Position(),
+					Start: prev,
+					End:   NewPositionFromState(curState),
 				}), Error{}
 
 		},
@@ -285,8 +180,8 @@ func Many0[T any](p Parser[T]) Parser[[]T] {
 				Value:     results,
 				NextState: curState,
 				Span: Span{
-					Start: *originalState.Position(),
-					End:   *curState.Position(),
+					Start: NewPositionFromState(originalState),
+					End:   NewPositionFromState(curState),
 				},
 			}, Error{}
 		},
@@ -312,8 +207,8 @@ func Many1[T any](p Parser[T]) Parser[[]T] {
 					Value:     results,
 					NextState: curState,
 					Span: Span{
-						Start: *originalState.Position(),
-						End:   *curState.Position(),
+						Start: NewPositionFromState(originalState),
+						End:   NewPositionFromState(curState),
 					},
 				}, Error{}
 			}
@@ -322,7 +217,7 @@ func Many1[T any](p Parser[T]) Parser[[]T] {
 				Message:  "Many1 parser failed.",
 				Expected: fmt.Sprintf("<%s> at least once", p.Label),
 				Got:      fmt.Sprintf("<%s> zero times", p.Label),
-				Position: *curState.Position(),
+				Position: NewPositionFromState(curState),
 			}
 		},
 		Label: fmt.Sprintf("<%s> one or more times.", p.Label),
@@ -357,7 +252,7 @@ func Sequence[T any](parsers []Parser[T]) Parser[T] {
 						Message:  "Sequence parser failed.",
 						Expected: err.Expected,
 						Got:      err.Got,
-						Position: *curState.Position(),
+						Position: NewPositionFromState(curState),
 					}
 				}
 				ret = res
@@ -377,7 +272,7 @@ func Between[T any](open, content, close Parser[T]) Parser[T] {
 					Message:  "Between parser failed.",
 					Expected: open.Label,
 					Got:      err.Got,
-					Position: *curState.Position(),
+					Position: NewPositionFromState(curState),
 				}
 			}
 
@@ -387,21 +282,21 @@ func Between[T any](open, content, close Parser[T]) Parser[T] {
 					Message:  "Between parser failed.",
 					Expected: content.Label,
 					Got:      err.Got,
-					Position: *curState.Position(),
+					Position: NewPositionFromState(curState),
 				}
 			}
 
-			closeRes, err := close.Run(contentRes.NextState)
+			_, err = close.Run(contentRes.NextState)
 			if err.HasError() {
 				return Result[T]{}, Error{
 					Message:  "Between parser failed.",
 					Expected: close.Label,
 					Got:      err.Got,
-					Position: *curState.Position(),
+					Position: NewPositionFromState(curState),
 				}
 			}
 
-			return closeRes, Error{}
+			return contentRes, Error{}
 		},
 		Label: fmt.Sprintf("<%s> between <%s> and <%s>", content.Label, open.Label, close.Label),
 	}
