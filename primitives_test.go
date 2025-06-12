@@ -112,7 +112,7 @@ func TestAlpha(t *testing.T) {
 			"1234",
 			Alpha(),
 			0,
-			true,		
+			true,
 		},
 		{
 			"Alphabet test 3",
@@ -120,7 +120,7 @@ func TestAlpha(t *testing.T) {
 			Alpha(),
 			0,
 			true,
-		},	
+		},
 		{
 			"Alphabet test 4",
 			"",
@@ -148,7 +148,7 @@ func TestAlpha(t *testing.T) {
 	}
 }
 
-func TestAlphaNum(t *testing.T)	{
+func TestAlphaNum(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
@@ -168,7 +168,7 @@ func TestAlphaNum(t *testing.T)	{
 			"1234",
 			AlphaNum(),
 			'1',
-			false,		
+			false,
 		},
 		{
 			"Alphanumeric test 3",
@@ -176,7 +176,7 @@ func TestAlphaNum(t *testing.T)	{
 			AlphaNum(),
 			0,
 			true,
-		},	
+		},
 		{
 			"Alphanumeric test 4",
 			"",
@@ -205,38 +205,38 @@ func TestAlphaNum(t *testing.T)	{
 }
 
 func TestCharWhere(t *testing.T) {
-	tests := []struct{
-		name string
-		input string
-		parser Parser[rune]
+	tests := []struct {
+		name     string
+		input    string
+		parser   Parser[rune]
 		expected rune
-		hasErr bool
+		hasErr   bool
 	}{
 		{
 			"Predicate char test 1",
 			"abcd",
-			CharWhere(func(r rune) bool {return r == 'a' || r == 'b'}, "chars a or b"),
+			CharWhere(func(r rune) bool { return r == 'a' || r == 'b' }, "chars a or b"),
 			'a',
 			false,
 		},
 		{
 			"Predicate char test 2",
 			"bbcd",
-			CharWhere(func(r rune) bool {return r == 'a' || r == 'b'}, "chars a or b"),
+			CharWhere(func(r rune) bool { return r == 'a' || r == 'b' }, "chars a or b"),
 			'b',
 			false,
 		},
 		{
 			"Predicate char test 3",
 			"ccdd",
-			CharWhere(func(r rune) bool {return r == 'a' || r == 'b'}, "chars a or b"),
+			CharWhere(func(r rune) bool { return r == 'a' || r == 'b' }, "chars a or b"),
 			0,
 			true,
 		},
 		{
 			"Predicate char test 4",
 			"",
-			CharWhere(func(r rune) bool {return r == 'a' || r == 'b'}, "chars a or b"),
+			CharWhere(func(r rune) bool { return r == 'a' || r == 'b' }, "chars a or b"),
 			0,
 			true,
 		},
@@ -261,12 +261,12 @@ func TestCharWhere(t *testing.T) {
 }
 
 func TestStringCI(t *testing.T) {
-	tests := []struct{
-		name string
-		input string
-		parser	 Parser[string]
+	tests := []struct {
+		name     string
+		input    string
+		parser   Parser[string]
 		expected string
-		hasErr bool
+		hasErr   bool
 	}{
 		{
 			"StringCI test 1",
@@ -294,7 +294,7 @@ func TestStringCI(t *testing.T) {
 			"",
 			StringCI("a"),
 			"",
-			true,	
+			true,
 		},
 		{
 			"StringCI test 5",
@@ -329,4 +329,3 @@ func TestStringCI(t *testing.T) {
 		}
 	}
 }
-
