@@ -9,7 +9,7 @@ type Error struct {
 	Message  string
 	Expected string
 	Got      string
-	Snippet string
+	Snippet  string
 	Position Position
 }
 
@@ -20,9 +20,9 @@ func (e *Error) HasError() bool {
 func (e *Error) String() string {
 	res := ""
 	if e.HasError() {
-		res = color.RedString(e.Message + "\n")	
+		res = color.RedString(e.Message + "\n")
 		res += color.RedString(fmt.Sprintf("Error occured at line %d, column %d, offset %d\n", e.Position.Line, e.Position.Column, e.Position.Offset))
-		res += color.HiWhiteString(e.FormattedSnippet()) 
+		res += color.HiWhiteString(e.FormattedSnippet())
 		res += color.HiGreenString(fmt.Sprintf("Expected value: <%s>\nInstead got: <%s>\n", e.Expected, e.Got))
 	}
 

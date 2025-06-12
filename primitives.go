@@ -8,8 +8,8 @@ import (
 
 func Digit() Parser[rune] {
 	var ret []Parser[rune]
-	for r := range 10 {
-		ret = append(ret, RuneParser(rune(r)))
+	for r := '0'; r <= '9'; r++ {
+		ret = append(ret, RuneParser(r))
 	}
 
 	return Or(ret...)
@@ -32,7 +32,7 @@ func AlphaNum() Parser[rune] {
 	alpha := Alpha()
 	num := Digit()
 
-	return Or(alpha, num)
+	return Or([]Parser[rune]{alpha, num}...)
 }
 
 func Whitespace() Parser[rune] {
@@ -53,16 +53,16 @@ func CharWhere(predicate func(rune) bool, label string) Parser[rune] {
 				}
 			}
 
-			r, size := utf8.DecodeRuneInString(curState.Input[curState.offset:])	
+			r, size := utf8.DecodeRuneInString(curState.Input[curState.offset:])
 			if predicate(r) {
 				newState := curState
 				newState.Consume(size)
 				return Result[rune]{
-					Value: r,
+					Value:     r,
 					NextState: curState,
 					Span: Span{
 						Start: NewPositionFromState(curState),
-						End: NewPositionFromState(newState),
+						End:   NewPositionFromState(newState),
 					},
 				}, Error{}
 			}
@@ -84,18 +84,18 @@ func StringCI(s string) Parser[string] {
 	lower := strings.ToLower(s)
 	return Parser[string]{
 		Run: func(curState State) (Result[string], Error) {
-			if !curState.InBounds(curState.offset + len(lower)) {
+			if !curState.InBounds(curState.offset + len(lower) - 1) {
 				lastLineStart := curState.LineStartBeforeCurrentOffset()
 				return Result[string]{}, Error{
 					Message:  "Reached the end of file while parsing",
 					Expected: fmt.Sprintf("String (case-insensitive) %s", s),
 					Got:      "EOF",
-					Snippet: curState.Input[curState.lineStarts[lastLineStart]:curState.lineStarts[min(len(curState.lineStarts)-1, lastLineStart+1)]],
+					Snippet:  curState.Input[curState.lineStarts[lastLineStart]:curState.lineStarts[min(len(curState.lineStarts)-1, lastLineStart+1)]],
 					Position: NewPositionFromState(curState),
 				}
 			}
 
-			got := curState.Input[curState.offset:curState.offset+len(lower)]
+			got := curState.Input[curState.offset : curState.offset+len(lower)]
 			if strings.ToLower(got) != lower {
 				lastLineStart := curState.LineStartBeforeCurrentOffset()
 				t := curState
@@ -103,7 +103,7 @@ func StringCI(s string) Parser[string] {
 				return Result[string]{}, Error{
 					Message:  "Strings do not match (case-insensitive).",
 					Expected: fmt.Sprintf("String (case-insensitive) %s", s),
-					Snippet: curState.Input[curState.lineStarts[lastLineStart]:curState.lineStarts[min(len(curState.lineStarts)-1, lastLineStart+1)]],
+					Snippet:  curState.Input[curState.lineStarts[lastLineStart]:curState.lineStarts[min(len(curState.lineStarts)-1, lastLineStart+1)]],
 					Got:      curState.Input[curState.offset : curState.offset+len(lower)],
 					Position: NewPositionFromState(curState),
 				}
@@ -137,16 +137,16 @@ func OneOf(chars string) Parser[rune] {
 
 // print trace every time it runs
 func Debug[T any](p Parser[T], name string) Parser[T] {
-	return	Parser[T]{
+	return Parser[T]{
 		Run: func(curState State) (result Result[T], error Error) {
 			fmt.Printf("Trying %s at position %v\n", name, NewPositionFromState(curState))
 			res, err := p.Run(curState)
 			fmt.Printf("Parser returned with\nResult: %v\nError: %v", res.Value, err)
 			return res, err
 		},
-		Label: p.Label,	
+		Label: p.Label,
 	}
-} 
+}
 
 // don't consume state on failing
 func Try[T any](p Parser[T]) Parser[T] {
@@ -161,7 +161,7 @@ func Try[T any](p Parser[T]) Parser[T] {
 				}, Error{}
 			}
 
-			return res, Error{}	
+			return res, Error{}
 		},
 	}
 }

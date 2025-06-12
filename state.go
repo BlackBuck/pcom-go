@@ -5,18 +5,16 @@ import (
 )
 
 type State struct {
-	Input  string
-	offset int
-	line   int
-	column int
+	Input      string
+	offset     int
+	line       int
+	column     int
 	lineStarts []int // offsets where newline chracters are present
 }
-
 
 func NewState(input string, position Position) State {
 	return State{input, position.Offset, position.Line, position.Column, []int{0}}
 }
-
 
 func (s *State) InBounds(offset int) bool {
 	return offset < len(s.Input)
@@ -87,12 +85,12 @@ func (s *State) ProgressLine() {
 	s.column = 1
 }
 
-func (s *State) LineStartBeforeCurrentOffset() int{
+func (s *State) LineStartBeforeCurrentOffset() int {
 	lo, hi := 0, len(s.lineStarts)-1
 	var mid int
 	for lo <= hi {
-		mid = (hi + lo)/2
-		
+		mid = (hi + lo) / 2
+
 		if s.lineStarts[mid] == s.offset {
 			return mid
 		} else if s.lineStarts[mid] > s.offset {
