@@ -25,7 +25,7 @@ func NewResult[T any](value T, nextState State, span Span) Result[T] {
 }
 
 // parser a single rune
-func RuneParser(c rune) Parser[rune] {
+func RuneParser(label string, c rune) Parser[rune] {
 	return Parser[rune]{
 		Run: func(curState State) (Result[rune], Error) {
 			if !curState.InBounds(curState.offset) {
@@ -52,18 +52,18 @@ func RuneParser(c rune) Parser[rune] {
 
 			
 			return Result[rune]{}, Error{
-				Message:  "Reached the end of file while parsing",
+				Message:  fmt.Sprintf("Failed to parse %s", label),
 				Expected: string(c),
 				Got:      string(curState.Input[curState.offset]),
 				Snippet:  GetSnippetStringFromCurrentContext(curState),
 				Position: NewPositionFromState(curState),
 			}
 		},
-		Label: fmt.Sprintf("the character <%s>", string(c)),
+		Label: label,
 	}
 }
 
-func StringParser(s string) Parser[string] {
+func StringParser(label string, s string) Parser[string] {
 	return Parser[string]{
 		Run: func(curState State) (Result[string], Error) {
 			if !curState.InBounds(curState.offset + len(s) - 1) {
@@ -103,18 +103,14 @@ func StringParser(s string) Parser[string] {
 				}), Error{}
 
 		},
-		Label: fmt.Sprintf("The string <%s>", s),
+		Label: label,
 	}
 }
 
 //TODO: Handle empty arrays for empty Parser[T] arrays as well
 
 // the OR combinator
-func Or[T any](parsers ...Parser[T]) Parser[T] {
-	label := parsers[0].Label
-	for _, parser := range parsers[1:] {
-		label = fmt.Sprintf("%s, %s", label, parser.Label)
-	}
+func Or[T any](label string, parsers ...Parser[T]) Parser[T] {
 	return Parser[T]{
 		Run: func(curState State) (Result[T], Error) {
 			var lastErr Error
@@ -140,11 +136,7 @@ func Or[T any](parsers ...Parser[T]) Parser[T] {
 	}
 }
 
-func And[T any](parsers ...Parser[T]) Parser[T] {
-	label := parsers[0].Label
-	for _, parser := range parsers[1:] {
-		label = fmt.Sprintf("%s, %s", label, parser.Label)
-	}
+func And[T any](label string, parsers ...Parser[T]) Parser[T] {
 	return Parser[T]{
 		Run: func(curState State) (Result[T], Error) {
 			var lastRes Result[T]
@@ -169,7 +161,7 @@ func And[T any](parsers ...Parser[T]) Parser[T] {
 	}
 }
 
-func Many0[T any](p Parser[T]) Parser[[]T] {
+func Many0[T any](label string, p Parser[T]) Parser[[]T] {
 	return Parser[[]T]{
 		Run: func(curState State) (Result[[]T], Error) {
 			var results []T
@@ -191,11 +183,11 @@ func Many0[T any](p Parser[T]) Parser[[]T] {
 				},
 			}, Error{}
 		},
-		Label: fmt.Sprintf("<%s> zero or more times.", p.Label),
+		Label: label,
 	}
 }
 
-func Many1[T any](p Parser[T]) Parser[[]T] {
+func Many1[T any](label string, p Parser[T]) Parser[[]T] {
 	return Parser[[]T]{
 		Run: func(curState State) (Result[[]T], Error) {
 			var results []T
@@ -228,11 +220,11 @@ func Many1[T any](p Parser[T]) Parser[[]T] {
 				Position: NewPositionFromState(curState),
 			}
 		},
-		Label: fmt.Sprintf("<%s> one or more times.", p.Label),
+		Label: label,
 	}
 }
 
-func Optional[T any](p Parser[T]) Parser[T] {
+func Optional[T any](label string, p Parser[T]) Parser[T] {
 	return Parser[T]{
 		Run: func(curState State) (Result[T], Error) {
 			res, err := p.Run(curState)
@@ -242,14 +234,11 @@ func Optional[T any](p Parser[T]) Parser[T] {
 
 			return res, Error{}
 		},
+		Label: label,
 	}
 }
 
-func Sequence[T any](parsers []Parser[T]) Parser[T] {
-	label := parsers[0].Label
-	for _, parser := range parsers[1:] {
-		label = fmt.Sprintf("<%s> -> <%s>", label, parser.Label)
-	}
+func Sequence[T any](label string, parsers []Parser[T]) Parser[T] {
 	return Parser[T]{
 		Run: func(curState State) (Result[T], Error) {
 			var ret Result[T]
@@ -273,7 +262,7 @@ func Sequence[T any](parsers []Parser[T]) Parser[T] {
 	}
 }
 
-func Between[T any](open, content, close Parser[T]) Parser[T] {
+func Between[T any](label string, open, content, close Parser[T]) Parser[T] {
 	return Parser[T]{
 		Run: func(curState State) (result Result[T], error Error) {
 			openRes, err := open.Run(curState)
@@ -314,11 +303,11 @@ func Between[T any](open, content, close Parser[T]) Parser[T] {
 
 			return contentRes, Error{}
 		},
-		Label: fmt.Sprintf("<%s> between <%s> and <%s>", content.Label, open.Label, close.Label),
+		Label: label,
 	}
 }
 
-func Map[A, B any](p1 Parser[A], f func(A) B) Parser[B] {
+func Map[A, B any](label string, p1 Parser[A], f func(A) B) Parser[B] {
 	return Parser[B]{
 		Run: func(curState State) (result Result[B], error Error) {
 			res, err := p1.Run(curState)
@@ -341,5 +330,6 @@ func Map[A, B any](p1 Parser[A], f func(A) B) Parser[B] {
 				},
 			}, Error{}
 		},
+		Label: label,
 	}
 }

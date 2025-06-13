@@ -9,34 +9,34 @@ import (
 func Digit() Parser[rune] {
 	var ret []Parser[rune]
 	for r := '0'; r <= '9'; r++ {
-		ret = append(ret, RuneParser(r))
+		ret = append(ret, RuneParser(fmt.Sprintf("Digit %s", string(r)), r))
 	}
 
-	return Or(ret...)
+	return Or("Digits", ret...)
 }
 
 func Alpha() Parser[rune] {
 	var ret []Parser[rune]
 	for r := 'A'; r <= 'Z'; r++ {
-		ret = append(ret, RuneParser(r))
+		ret = append(ret, RuneParser(fmt.Sprintf("char %s", string(r)), r))
 	}
 
 	for r := 'a'; r <= 'z'; r++ {
-		ret = append(ret, RuneParser(r))
+		ret = append(ret, RuneParser(fmt.Sprintf("char %s", string(r)), r))
 	}
 
-	return Or(ret...)
+	return Or("Alphabet", ret...)
 }
 
 func AlphaNum() Parser[rune] {
 	alpha := Alpha()
 	num := Digit()
 
-	return Or([]Parser[rune]{alpha, num}...)
+	return Or("Alphanumeric", []Parser[rune]{alpha, num}...)
 }
 
 func Whitespace() Parser[rune] {
-	return RuneParser(' ')
+	return RuneParser("whitespace", ' ')
 }
 
 func CharWhere(predicate func(rune) bool, label string) Parser[rune] {

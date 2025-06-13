@@ -31,7 +31,7 @@ func testRuneParserFail(t *testing.T, input string, expected rune, parser Parser
 }
 
 func TestRuneParser_A(t *testing.T) {
-	parser := RuneParser('a')
+	parser := RuneParser("char a", 'a')
 	testRuneParserPass(t, "abc", 'a', parser)
 }
 
@@ -47,8 +47,8 @@ func TestRuneParser(t *testing.T) {
 		expected rune
 		parser   Parser[rune]
 	}{
-		{"abc", 'a', RuneParser('a')},
-		{"bcd", 'b', RuneParser('b')},
+		{"abc", 'a', RuneParser("char a", 'a')},
+		{"bcd", 'b', RuneParser("char b", 'b')},
 	}
 
 	for _, c := range cases {
@@ -62,8 +62,8 @@ func TestStringParser(t *testing.T) {
 		expected string
 		parser   Parser[string]
 	}{
-		{"helloworld", "hello", StringParser("hello")},
-		{"Mr. Doofinsmurts", "Mr.", StringParser("Mr.")},
+		{"helloworld", "hello", StringParser("string hello", "hello")},
+		{"Mr. Doofinsmurts", "Mr.", StringParser("honorific", "Mr.")},
 	}
 
 	for _, c := range cases {
@@ -88,13 +88,13 @@ func TestOr(t *testing.T) {
 	}{
 		{
 			"match first alternative",
-			Or(RuneParser('a'), RuneParser('b')),
+			Or("a or b", RuneParser("char a", 'a'), RuneParser("char b", 'b')),
 			"abc",
 			'a',
 		},
 		{
 			"match second alternative",
-			Or(RuneParser('x'), RuneParser('b')),
+			Or("x or b", RuneParser("char x", 'x'), RuneParser("char b", 'b')),
 			"bcd",
 			'b',
 		},
@@ -123,7 +123,7 @@ func TestAnd(t *testing.T) {
 	}{
 		{
 			"match all in sequence",
-			[]Parser[rune]{Or(RuneParser('a'), RuneParser('b')), RuneParser('a')},
+			[]Parser[rune]{Or("a or b or c", RuneParser("char a", 'a'), RuneParser("char b", 'b')), RuneParser("char c", 'c')},
 			"abc",
 			'a',
 		},
@@ -132,7 +132,7 @@ func TestAnd(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			state := NewState(tt.input, Position{0, 1, 1})
-			result, err := And(tt.parsers...).Run(state)
+			result, err := And("And test", tt.parsers...).Run(state)
 			if err.HasError() {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -152,13 +152,13 @@ func TestMany0(t *testing.T) {
 	}{
 		{
 			"zero or more 'a'",
-			Many0(RuneParser('a')),
+			Many0("one or more a", RuneParser("char a", 'a')),
 			"aaab",
 			[]rune{'a', 'a', 'a'},
 		},
 		{
 			"zero matches",
-			Many0(RuneParser('x')),
+			Many0("x oncr more", RuneParser("char x", 'x')),
 			"abc",
 			[]rune{},
 		},
@@ -193,14 +193,14 @@ func TestMany1(t *testing.T) {
 	}{
 		{
 			"match many a",
-			Many1(RuneParser('a')),
+			Many1("a once or more", RuneParser("char a", 'a')),
 			"aaab",
 			[]rune{'a', 'a', 'a'},
 			false,
 		},
 		{
 			"no match error",
-			Many1(RuneParser('x')),
+			Many1("x once or more", RuneParser("char x", 'x')),
 			"abc",
 			nil,
 			true,
@@ -242,14 +242,14 @@ func TestBetween(t *testing.T) {
 	}{
 		{
 			"match between parentheses",
-			Between(RuneParser('('), RuneParser('x'), RuneParser(')')),
+			Between("x in brackets", RuneParser("bracket open", '('), RuneParser("char x", 'x'), RuneParser("bracket close", ')')),
 			"(x)",
 			'x',
 			false,
 		},
 		{
 			"fail on missing close",
-			Between(RuneParser('('), RuneParser('x'), RuneParser(')')),
+			Between("x in brackets", RuneParser("bracket open", '('), RuneParser("char x", 'x'), RuneParser("bracket close", ')')),
 			"(x",
 			0,
 			true,
