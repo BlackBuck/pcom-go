@@ -88,7 +88,7 @@ func (s *State) ProgressLine() {
 func (s *State) LineStartBeforeCurrentOffset() int {
 	lo, hi := 0, len(s.lineStarts)-1
 	var mid int
-	for lo <= hi {
+	for lo < hi {
 		mid = (hi + lo) / 2
 
 		if s.lineStarts[mid] == s.offset {
@@ -101,6 +101,15 @@ func (s *State) LineStartBeforeCurrentOffset() int {
 	}
 
 	return hi
+}
+
+func GetSnippetStringFromCurrentContext(s State) string {
+	if len(s.lineStarts) == 1 {
+		return s.Input[:min(len(s.Input), s.column)]	
+	}
+
+	lastLine := s.LineStartBeforeCurrentOffset()
+	return s.Input[s.lineStarts[lastLine]:s.lineStarts[min(len(s.lineStarts)-1, lastLine+1)]]
 }
 
 func isCRLF(s *State) bool {
