@@ -140,5 +140,3 @@ Examples will be included in `/examples`:
 ## 🛡️ License
 
 MIT License © 2025 [Anil Bishnoi](https://github.com/BlackBuck)
-
-```
