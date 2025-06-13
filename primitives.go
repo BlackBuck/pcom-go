@@ -85,25 +85,23 @@ func StringCI(s string) Parser[string] {
 	return Parser[string]{
 		Run: func(curState State) (Result[string], Error) {
 			if !curState.InBounds(curState.offset + len(lower) - 1) {
-				lastLineStart := curState.LineStartBeforeCurrentOffset()
 				return Result[string]{}, Error{
 					Message:  "Reached the end of file while parsing",
 					Expected: fmt.Sprintf("String (case-insensitive) %s", s),
 					Got:      "EOF",
-					Snippet:  curState.Input[curState.lineStarts[lastLineStart]:curState.lineStarts[min(len(curState.lineStarts)-1, lastLineStart+1)]],
+					Snippet:  GetSnippetStringFromCurrentContext(curState),
 					Position: NewPositionFromState(curState),
 				}
 			}
 
 			got := curState.Input[curState.offset : curState.offset+len(lower)]
 			if strings.ToLower(got) != lower {
-				lastLineStart := curState.LineStartBeforeCurrentOffset()
 				t := curState
 				t.Consume(len(lower))
 				return Result[string]{}, Error{
 					Message:  "Strings do not match (case-insensitive).",
 					Expected: fmt.Sprintf("String (case-insensitive) %s", s),
-					Snippet:  curState.Input[curState.lineStarts[lastLineStart]:curState.lineStarts[min(len(curState.lineStarts)-1, lastLineStart+1)]],
+					Snippet:  GetSnippetStringFromCurrentContext(curState),
 					Got:      curState.Input[curState.offset : curState.offset+len(lower)],
 					Position: NewPositionFromState(curState),
 				}

@@ -96,11 +96,20 @@ func (s *State) LineStartBeforeCurrentOffset() int {
 		} else if s.lineStarts[mid] > s.offset {
 			hi = mid - 1
 		} else {
-			lo = mid
+			lo = mid + 1
 		}
 	}
 
-	return lo
+	return hi
+}
+
+func GetSnippetStringFromCurrentContext(s State) string {
+	if len(s.lineStarts) == 1 {
+		return s.Input[:min(len(s.Input), s.column)]	
+	}
+
+	lastLine := s.LineStartBeforeCurrentOffset()
+	return s.Input[s.lineStarts[lastLine]:s.lineStarts[min(len(s.lineStarts)-1, lastLine+1)]]
 }
 
 func isCRLF(s *State) bool {
