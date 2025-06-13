@@ -88,7 +88,7 @@ func (s *State) ProgressLine() {
 func (s *State) LineStartBeforeCurrentOffset() int {
 	lo, hi := 0, len(s.lineStarts)-1
 	var mid int
-	for lo <= hi {
+	for lo < hi {
 		mid = (hi + lo) / 2
 
 		if s.lineStarts[mid] == s.offset {
@@ -96,11 +96,11 @@ func (s *State) LineStartBeforeCurrentOffset() int {
 		} else if s.lineStarts[mid] > s.offset {
 			hi = mid - 1
 		} else {
-			lo = mid + 1
+			lo = mid
 		}
 	}
 
-	return hi
+	return lo
 }
 
 func isCRLF(s *State) bool {
