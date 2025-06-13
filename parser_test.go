@@ -17,19 +17,6 @@ func testRuneParserPass(t *testing.T, input string, expected rune, parser Parser
 	}
 }
 
-func testRuneParserFail(t *testing.T, input string, expected rune, parser Parser[rune]) {
-	state := NewState(input, Position{0, 1, 1})
-	result, err := parser.Run(state)
-
-	if !err.HasError() {
-		t.Errorf("expected error %s\ninstead got nothing", err.String())
-	}
-
-	if result.Value == expected {
-		t.Errorf("Expected value '\x00', got %q", result.Value)
-	}
-}
-
 func TestRuneParser_A(t *testing.T) {
 	parser := RuneParser("char a", 'a')
 	testRuneParserPass(t, "abc", 'a', parser)
@@ -273,5 +260,207 @@ func TestBetween(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestThenParser(t *testing.T) {
+	letter := RuneParser("x", 'x')
+	semicolon := RuneParser(";", ';')
+	expr := Then("x then semicolon", letter, semicolon)
+	tests := []struct {
+		name string
+		input string
+		expected Pair[rune, rune]
+		wantErr bool
+	}{
+		{
+			"Then parser test 1",
+			"x;",
+			Pair[rune, rune]{'x', ';'},
+			false,
+		},
+		{
+			"Then parser test 2",
+			"x",
+			Pair[rune, rune]{},
+			true,
+		},
+		{
+			"Then parser test 3",
+			"\n",
+			Pair[rune, rune]{},
+			true,
+		},
+		{
+			"Then parser test 4",
+			"",
+			Pair[rune, rune]{},
+			true,
+		},
+	}
+
+	for _, test := range tests {
+		res, err := expr.Run(NewState(test.input, Position{0, 1, 1}))
+		if test.wantErr {
+			if !err.HasError() {
+				t.Errorf("%s failed\nexpected error, got nil\n", test.name)
+			}
+		} else {
+			if err.HasError() {
+				t.Errorf("%s failed\nExpected: %v\tGot: error\n", test.name, res.Value)
+			}
+			
+			if res.Value != test.expected {
+				t.Errorf("%s failed\nExpected: %v\tGot: %v\n", test.name, test.expected, res.Value)
+			}
+		}
+	}
+}
+
+func TestKeepLeft(t *testing.T) {
+	letter := RuneParser("x", 'x')
+	semicolon := RuneParser(";", ';')
+	expr := KeepLeft("keep x before the semicolon", Then("x then semicolon", letter, semicolon))
+	tests := []struct {
+		name string
+		input string
+		expected rune
+		wantErr bool
+	}{
+		{
+			"Then parser test 1",
+			"x;",
+			'x',
+			false,
+		},
+		{
+			"Then parser test 2",
+			"x",
+			0,
+			true,
+		},
+		{
+			"Then parser test 3",
+			"\n",
+			0,
+			true,
+		},
+		{
+			"Then parser test 4",
+			"",
+			0,
+			true,
+		},
+	}
+
+	for _, test := range tests {
+		res, err := expr.Run(NewState(test.input, Position{0, 1, 1}))
+		if test.wantErr {
+			if !err.HasError() {
+				t.Errorf("%s failed\nexpected error, got nil\n", test.name)
+			}
+		} else {
+			if err.HasError() {
+				t.Errorf("%s failed\nExpected: %v\tGot: error\n", test.name, res.Value)
+			}
+			
+			if res.Value != test.expected {
+				t.Errorf("%s failed\nExpected: %v\tGot: %v\n", test.name, test.expected, res.Value)
+			}
+		}
+	}
+}
+
+func TestKeepRight(t *testing.T) {
+	letter := RuneParser("x", 'x')
+	semicolon := RuneParser(";", ';')
+	expr := KeepRight("keep x before the semicolon", Then("x then semicolon", letter, semicolon))
+	tests := []struct {
+		name string
+		input string
+		expected rune
+		wantErr bool
+	}{
+		{
+			"Then parser test 1",
+			"x;",
+			';',
+			false,
+		},
+		{
+			"Then parser test 2",
+			"x",
+			0,
+			true,
+		},
+		{
+			"Then parser test 3",
+			"\n",
+			0,
+			true,
+		},
+		{
+			"Then parser test 4",
+			"",
+			0,
+			true,
+		},
+	}
+
+	for _, test := range tests {
+		res, err := expr.Run(NewState(test.input, Position{0, 1, 1}))
+		if test.wantErr {
+			if !err.HasError() {
+				t.Errorf("%s failed\nexpected error, got nil\n", test.name)
+			}
+		} else {
+			if err.HasError() {
+				t.Errorf("%s failed\nExpected: %v\tGot: error\n", test.name, res.Value)
+			}
+			
+			if res.Value != test.expected {
+				t.Errorf("%s failed\nExpected: %v\tGot: %v\n", test.name, test.expected, res.Value)
+			}
+		}
+	}
+}
+
+func TestLazyRecursive(t *testing.T) {
+	var parens Parser[rune]
+	letter := RuneParser("x", 'x')
+
+	parens = Lazy("paren expr", func() Parser[rune] {
+		return Or("paren expression",
+			letter,
+			Between("in parens", RuneParser("(", '('), parens, RuneParser(")", ')')),
+		)
+	})
+
+	tests := []struct {
+		input    string
+		expected rune
+		wantErr  bool
+	}{
+		{"x", 'x', false},
+		{"(x)", 'x', false},
+		{"((x))\n((x))", 'x', false},
+		{"(((x)))", 'x', false},
+		{"((y))", 0, true},
+	}
+
+	for _, tt := range tests {
+		res, err := parens.Run(NewState(tt.input, Position{0, 1, 1}))
+		if tt.wantErr {
+			if !err.HasError() {
+				t.Errorf("expected error, got result: %v", res.Value)
+			}
+		} else {
+			if err.HasError() {
+				t.Errorf("unexpected error: %s", err.String())
+			}
+			if res.Value != tt.expected {
+				t.Errorf("expected %q, got %q", tt.expected, res.Value)
+			}
+		}
 	}
 }

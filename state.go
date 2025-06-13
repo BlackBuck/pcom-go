@@ -105,7 +105,7 @@ func (s *State) LineStartBeforeCurrentOffset() int {
 
 func GetSnippetStringFromCurrentContext(s State) string {
 	if len(s.lineStarts) == 1 {
-		return s.Input[:min(len(s.Input), s.column)]	
+		return s.Input[:min(len(s.Input), s.column)]
 	}
 
 	lastLine := s.LineStartBeforeCurrentOffset()
