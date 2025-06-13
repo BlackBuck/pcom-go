@@ -21,7 +21,7 @@ func (e *Error) String() string {
 	res := ""
 	if e.HasError() {
 		res = color.RedString(e.Message + "\n")
-		res += color.RedString(fmt.Sprintf("Error occured at line %d, column %d, offset %d\n", e.Position.Line, e.Position.Column, e.Position.Offset))
+		res += color.RedString(fmt.Sprintf("Error occurred at line %d, column %d, offset %d\n", e.Position.Line, e.Position.Column, e.Position.Offset))
 		res += color.HiWhiteString(e.FormattedSnippet())
 		res += color.HiGreenString(fmt.Sprintf("Expected value: <%s>\nInstead got: <%s>\n", e.Expected, e.Got))
 	}
@@ -32,7 +32,7 @@ func (e *Error) String() string {
 func (e *Error) FormattedSnippet() string {
 	res := e.Snippet
 	res += "\n"
-	for _ = range e.Position.Column {
+	for range e.Position.Column {
 		res += " "
 	}
 	res += "^"
