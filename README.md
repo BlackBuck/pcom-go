@@ -141,4 +141,3 @@ Examples will be included in `/examples`:
 
 MIT License © 2025 [Anil Bishnoi](https://github.com/BlackBuck)
 
-```
