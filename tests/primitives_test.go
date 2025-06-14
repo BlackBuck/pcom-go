@@ -2,6 +2,8 @@ package parser
 
 import (
 	"testing"
+	parser "github.com/BlackBuck/pcom-go/parser"
+	state "github.com/BlackBuck/pcom-go/state"
 )
 
 func TestWhitespace(t *testing.T) {
@@ -26,7 +28,7 @@ func TestWhitespace(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		res, err := Whitespace().Run(NewState(test.input, Position{0, 1, 1}))
+		res, err := parser.Whitespace().Run(state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1}))
 		if test.wantErr {
 			if !err.HasError() {
 				t.Errorf("%s failed\nExpected: error\nGot: %v\n", test.name, res.Value)
@@ -47,35 +49,35 @@ func TestDigit(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		parser   Parser[rune]
+		parser   parser.Parser[rune]
 		expected rune
 		hasErr   bool
 	}{
 		{
-			"Digit test 1",
+			"parser.Digit test 1",
 			"1234",
-			Digit(),
+			parser.Digit(),
 			'1',
 			false,
 		},
 		{
-			"Digit test 2",
+			"parser.Digit test 2",
 			"",
-			Digit(),
+			parser.Digit(),
 			0,
 			true,
 		},
 		{
-			"Digit test 2",
+			"parser.Digit test 2",
 			"abcd",
-			Digit(),
+			parser.Digit(),
 			0,
 			true,
 		},
 	}
 
 	for _, test := range tests {
-		res, err := test.parser.Run(NewState(test.input, Position{0, 1, 1}))
+		res, err := test.parser.Run(state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1}))
 		if test.hasErr {
 			if !err.HasError() {
 				t.Errorf("%s failed\nExpected: error\nGot: %v\n", test.name, res.Value)
@@ -96,42 +98,42 @@ func TestAlpha(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		parser   Parser[rune]
+		parser   parser.Parser[rune]
 		expected rune
 		hasErr   bool
 	}{
 		{
 			"Alphabet test 1",
 			"abcd",
-			Alpha(),
+			parser.Alpha(),
 			'a',
 			false,
 		},
 		{
 			"Alphabet test 2",
 			"1234",
-			Alpha(),
+			parser.Alpha(),
 			0,
 			true,
 		},
 		{
 			"Alphabet test 3",
 			"$$123",
-			Alpha(),
+			parser.Alpha(),
 			0,
 			true,
 		},
 		{
 			"Alphabet test 4",
 			"",
-			Alpha(),
+			parser.Alpha(),
 			0,
 			true,
 		},
 	}
 
 	for _, test := range tests {
-		res, err := test.parser.Run(NewState(test.input, Position{0, 1, 1}))
+		res, err := test.parser.Run(state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1}))
 		if test.hasErr {
 			if !err.HasError() {
 				t.Errorf("%s failed\nExpected: error\nGot: %v\n", test.name, res.Value)
@@ -152,42 +154,42 @@ func TestAlphaNum(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		parser   Parser[rune]
+		parser   parser.Parser[rune]
 		expected rune
 		hasErr   bool
 	}{
 		{
 			"Alphanumeric test 1",
 			"abcd",
-			AlphaNum(),
+			parser.AlphaNum(),
 			'a',
 			false,
 		},
 		{
 			"Alphanumeric test 2",
 			"1234",
-			AlphaNum(),
+			parser.AlphaNum(),
 			'1',
 			false,
 		},
 		{
 			"Alphanumeric test 3",
 			"$$123",
-			AlphaNum(),
+			parser.AlphaNum(),
 			0,
 			true,
 		},
 		{
 			"Alphanumeric test 4",
 			"",
-			AlphaNum(),
+			parser.AlphaNum(),
 			0,
 			true,
 		},
 	}
 
 	for _, test := range tests {
-		res, err := test.parser.Run(NewState(test.input, Position{0, 1, 1}))
+		res, err := test.parser.Run(state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1}))
 		if test.hasErr {
 			if !err.HasError() {
 				t.Errorf("%s failed\nExpected: error\nGot: %v\n", test.name, res.Value)
@@ -208,42 +210,42 @@ func TestCharWhere(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		parser   Parser[rune]
+		parser   parser.Parser[rune]
 		expected rune
 		hasErr   bool
 	}{
 		{
 			"Predicate char test 1",
 			"abcd",
-			CharWhere(func(r rune) bool { return r == 'a' || r == 'b' }, "chars a or b"),
+			parser.CharWhere(func(r rune) bool { return r == 'a' || r == 'b' }, "chars a or b"),
 			'a',
 			false,
 		},
 		{
 			"Predicate char test 2",
 			"bbcd",
-			CharWhere(func(r rune) bool { return r == 'a' || r == 'b' }, "chars a or b"),
+			parser.CharWhere(func(r rune) bool { return r == 'a' || r == 'b' }, "chars a or b"),
 			'b',
 			false,
 		},
 		{
 			"Predicate char test 3",
 			"ccdd",
-			CharWhere(func(r rune) bool { return r == 'a' || r == 'b' }, "chars a or b"),
+			parser.CharWhere(func(r rune) bool { return r == 'a' || r == 'b' }, "chars a or b"),
 			0,
 			true,
 		},
 		{
 			"Predicate char test 4",
 			"",
-			CharWhere(func(r rune) bool { return r == 'a' || r == 'b' }, "chars a or b"),
+			parser.CharWhere(func(r rune) bool { return r == 'a' || r == 'b' }, "chars a or b"),
 			0,
 			true,
 		},
 	}
 
 	for _, test := range tests {
-		res, err := test.parser.Run(NewState(test.input, Position{0, 1, 1}))
+		res, err := test.parser.Run(state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1}))
 		if test.hasErr {
 			if !err.HasError() {
 				t.Errorf("%s failed\nExpected: error\nGot: %v\n", test.name, res.Value)
@@ -264,56 +266,56 @@ func TestStringCI(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
-		parser   Parser[string]
+		parser   parser.Parser[string]
 		expected string
 		hasErr   bool
 	}{
 		{
-			"StringCI test 1",
+			"parser.StringCI test 1",
 			"AAbb",
-			StringCI("aabb"),
+			parser.StringCI("aabb"),
 			"AAbb",
 			false,
 		},
 		{
-			"StringCI test 2",
+			"parser.StringCI test 2",
 			"AA bb",
-			StringCI("aa"),
+			parser.StringCI("aa"),
 			"AA",
 			false,
 		},
 		{
-			"StringCI test 3",
+			"parser.StringCI test 3",
 			"AbCd",
-			StringCI("abcd"),
+			parser.StringCI("abcd"),
 			"AbCd",
 			false,
 		},
 		{
-			"StringCI test 4",
+			"parser.StringCI test 4",
 			"",
-			StringCI("a"),
+			parser.StringCI("a"),
 			"",
 			true,
 		},
 		{
-			"StringCI test 5",
+			"parser.StringCI test 5",
 			"Mr. Bihari",
-			StringCI("Mr."),
+			parser.StringCI("Mr."),
 			"Mr.",
 			false,
 		},
 		{
-			"StringCI test 6",
+			"parser.StringCI test 6",
 			"%#!$",
-			StringCI("abc"),
+			parser.StringCI("abc"),
 			"",
 			true,
 		},
 	}
 
 	for _, test := range tests {
-		res, err := test.parser.Run(NewState(test.input, Position{0, 1, 1}))
+		res, err := test.parser.Run(state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1}))
 		if test.hasErr {
 			if !err.HasError() {
 				t.Errorf("%s failed\nExpected: error\nGot: %v\n", test.name, res.Value)

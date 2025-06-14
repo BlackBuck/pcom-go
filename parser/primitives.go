@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"unicode/utf8"
+	state "github.com/BlackBuck/pcom-go/state"
 )
 
 func Digit() Parser[rune] {
@@ -41,28 +42,28 @@ func Whitespace() Parser[rune] {
 
 func CharWhere(predicate func(rune) bool, label string) Parser[rune] {
 	return Parser[rune]{
-		Run: func(curState State) (Result[rune], Error) {
-			if !curState.InBounds(curState.offset) {
+		Run: func(curState state.State) (Result[rune], Error) {
+			if !curState.InBounds(curState.Offset) {
 				lastLineStart := curState.LineStartBeforeCurrentOffset()
 				return Result[rune]{}, Error{
 					Message:  "Char parser with predicate failed.",
 					Expected: label,
 					Got:      "EOF",
-					Snippet:  curState.Input[curState.lineStarts[lastLineStart]:curState.lineStarts[min(len(curState.lineStarts)-1, lastLineStart+1)]],
-					Position: NewPositionFromState(curState),
+					Snippet:  curState.Input[curState.LineStarts[lastLineStart]:curState.LineStarts[min(len(curState.LineStarts)-1, lastLineStart+1)]],
+					Position: state.NewPositionFromState(curState),
 				}
 			}
 
-			r, size := utf8.DecodeRuneInString(curState.Input[curState.offset:])
+			r, size := utf8.DecodeRuneInString(curState.Input[curState.Offset:])
 			if predicate(r) {
 				newState := curState
 				newState.Consume(size)
 				return Result[rune]{
 					Value:     r,
 					NextState: curState,
-					Span: Span{
-						Start: NewPositionFromState(curState),
-						End:   NewPositionFromState(newState),
+					Span: state.Span{
+						Start: state.NewPositionFromState(curState),
+						End:   state.NewPositionFromState(newState),
 					},
 				}, Error{}
 			}
@@ -71,8 +72,8 @@ func CharWhere(predicate func(rune) bool, label string) Parser[rune] {
 				Message:  "Char parser with predicate failed.",
 				Expected: label,
 				Got:      string(r),
-				Snippet:  curState.Input[curState.lineStarts[lastLineStart]:curState.lineStarts[min(len(curState.lineStarts)-1, lastLineStart+1)]],
-				Position: NewPositionFromState(curState),
+				Snippet:  curState.Input[curState.LineStarts[lastLineStart]:curState.LineStarts[min(len(curState.LineStarts)-1, lastLineStart+1)]],
+				Position: state.NewPositionFromState(curState),
 			}
 		},
 		Label: fmt.Sprintf("Char where <%s>", label),
@@ -83,38 +84,38 @@ func CharWhere(predicate func(rune) bool, label string) Parser[rune] {
 func StringCI(s string) Parser[string] {
 	lower := strings.ToLower(s)
 	return Parser[string]{
-		Run: func(curState State) (Result[string], Error) {
-			if !curState.InBounds(curState.offset + len(lower) - 1) {
+		Run: func(curState state.State) (Result[string], Error) {
+			if !curState.InBounds(curState.Offset + len(lower) - 1) {
 				return Result[string]{}, Error{
 					Message:  "Reached the end of file while parsing",
 					Expected: fmt.Sprintf("String (case-insensitive) %s", s),
 					Got:      "EOF",
-					Snippet:  GetSnippetStringFromCurrentContext(curState),
-					Position: NewPositionFromState(curState),
+					Snippet:  state.GetSnippetStringFromCurrentContext(curState),
+					Position: state.NewPositionFromState(curState),
 				}
 			}
 
-			got := curState.Input[curState.offset : curState.offset+len(lower)]
+			got := curState.Input[curState.Offset : curState.Offset+len(lower)]
 			if strings.ToLower(got) != lower {
 				t := curState
 				t.Consume(len(lower))
 				return Result[string]{}, Error{
 					Message:  "Strings do not match (case-insensitive).",
 					Expected: fmt.Sprintf("String (case-insensitive) %s", s),
-					Snippet:  GetSnippetStringFromCurrentContext(curState),
-					Got:      curState.Input[curState.offset : curState.offset+len(lower)],
-					Position: NewPositionFromState(curState),
+					Snippet:  state.GetSnippetStringFromCurrentContext(curState),
+					Got:      curState.Input[curState.Offset : curState.Offset+len(lower)],
+					Position: state.NewPositionFromState(curState),
 				}
 			}
 
-			prev := NewPositionFromState(curState)
+			prev := state.NewPositionFromState(curState)
 			curState.Consume(len(lower))
 			return NewResult(
 				got,
 				curState,
-				Span{
+				state.Span{
 					Start: prev,
-					End:   NewPositionFromState(curState),
+					End:   state.NewPositionFromState(curState),
 				}), Error{}
 
 		},
@@ -136,8 +137,8 @@ func OneOf(chars string) Parser[rune] {
 // print trace every time it runs
 func Debug[T any](p Parser[T], name string) Parser[T] {
 	return Parser[T]{
-		Run: func(curState State) (result Result[T], error Error) {
-			fmt.Printf("Trying %s at position %v\n", name, NewPositionFromState(curState))
+		Run: func(curState state.State) (result Result[T], error Error) {
+			fmt.Printf("Trying %s at position %v\n", name, state.NewPositionFromState(curState))
 			res, err := p.Run(curState)
 			fmt.Printf("Parser returned with\nResult: %v\nError: %v", res.Value, err)
 			return res, err
@@ -149,7 +150,7 @@ func Debug[T any](p Parser[T], name string) Parser[T] {
 // don't consume state on failing
 func Try[T any](p Parser[T]) Parser[T] {
 	return Parser[T]{
-		Run: func(curState State) (result Result[T], error Error) {
+		Run: func(curState state.State) (result Result[T], error Error) {
 			prevState := curState
 
 			res, err := p.Run(curState)
@@ -168,7 +169,7 @@ func Try[T any](p Parser[T]) Parser[T] {
 func Lexeme[T any](p Parser[T]) Parser[T] {
 	return Parser[T]{
 		Label: fmt.Sprintf("lexeme <%s>", p.Label),
-		Run: func(s State) (Result[T], Error) {
+		Run: func(s state.State) (Result[T], Error) {
 			res, err := p.Run(s)
 			if err.HasError() {
 				return res, err

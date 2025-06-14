@@ -1,4 +1,4 @@
-package parser
+package state
 
 type Position struct {
 	Offset int // byte offset
@@ -8,8 +8,8 @@ type Position struct {
 
 func NewPositionFromState(s State) Position {
 	return Position{
-		Offset: s.offset,
-		Line:   s.line,
-		Column: s.column,
+		Offset: s.Offset,
+		Line:   s.Line,
+		Column: s.Column,
 	}
 }

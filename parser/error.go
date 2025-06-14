@@ -2,6 +2,8 @@ package parser
 
 import (
 	"fmt"
+
+	state "github.com/BlackBuck/pcom-go/state"
 	"github.com/fatih/color"
 )
 
@@ -10,7 +12,7 @@ type Error struct {
 	Expected string
 	Got      string
 	Snippet  string
-	Position Position
+	Position state.Position
 }
 
 func (e *Error) HasError() bool {

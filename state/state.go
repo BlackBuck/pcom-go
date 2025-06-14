@@ -1,15 +1,20 @@
-package parser
+package state
 
 import (
 	"unicode/utf8"
+
 )
+type Span struct {
+	Start Position
+	End   Position
+}
 
 type State struct {
 	Input      string
-	offset     int
-	line       int
-	column     int
-	lineStarts []int // offsets where newline chracters are present
+	Offset     int
+	Line       int
+	Column     int
+	LineStarts []int // offsets where newline chracters are present
 }
 
 func NewState(input string, position Position) State {
@@ -20,7 +25,7 @@ func (s *State) InBounds(offset int) bool {
 	return offset < len(s.Input)
 }
 func (s *State) HasAvailableChars(n int) bool {
-	return s.offset < len(s.Input)-n+1
+	return s.Offset < len(s.Input)-n+1
 }
 
 func isNewLineChar(c rune) bool {
@@ -59,18 +64,18 @@ func (s *State) Consume(n int) (string, Span, bool) {
 }
 
 func (s *State) UpdatePosition(pos Position) {
-	s.offset = pos.Offset
-	s.column = pos.Column
-	s.line = pos.Line
+	s.Offset = pos.Offset
+	s.Column = pos.Column
+	s.Line = pos.Line
 }
 
 func (s *State) UpdateColumn(n int) {
-	s.column += n
+	s.Column += n
 	s.UpdateOffset(n)
 }
 
 func (s *State) UpdateOffset(n int) {
-	s.offset += n
+	s.Offset += n
 }
 
 func (s *State) ProgressLine() {
@@ -80,20 +85,20 @@ func (s *State) ProgressLine() {
 	} else {
 		s.UpdateOffset(1)
 	}
-	s.lineStarts = append(s.lineStarts, s.offset)
-	s.line += 1
-	s.column = 1
+	s.LineStarts = append(s.LineStarts, s.Offset)
+	s.Line += 1
+	s.Column = 1
 }
 
 func (s *State) LineStartBeforeCurrentOffset() int {
-	lo, hi := 0, len(s.lineStarts)-1
+	lo, hi := 0, len(s.LineStarts)-1
 	var mid int
 	for lo < hi {
 		mid = (hi + lo) / 2
 
-		if s.lineStarts[mid] == s.offset {
+		if s.LineStarts[mid] == s.Offset {
 			return mid
-		} else if s.lineStarts[mid] > s.offset {
+		} else if s.LineStarts[mid] > s.Offset {
 			hi = mid - 1
 		} else {
 			lo = mid + 1
@@ -104,16 +109,16 @@ func (s *State) LineStartBeforeCurrentOffset() int {
 }
 
 func GetSnippetStringFromCurrentContext(s State) string {
-	if len(s.lineStarts) == 1 {
-		return s.Input[:min(len(s.Input), s.column)]
+	if len(s.LineStarts) == 1 {
+		return s.Input[:min(len(s.Input), s.Column)]
 	}
 
 	lastLine := s.LineStartBeforeCurrentOffset()
-	return s.Input[s.lineStarts[lastLine]:s.lineStarts[min(len(s.lineStarts)-1, lastLine+1)]]
+	return s.Input[s.LineStarts[lastLine]:s.LineStarts[min(len(s.LineStarts)-1, lastLine+1)]]
 }
 
 func isCRLF(s *State) bool {
-	if s.Input[s.offset] == '\r' && (len(s.Input) > s.offset+1 && s.Input[s.offset+1] == '\n') {
+	if s.Input[s.Offset] == '\r' && (len(s.Input) > s.Offset+1 && s.Input[s.Offset+1] == '\n') {
 		return true
 	}
 	return false

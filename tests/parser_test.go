@@ -1,11 +1,13 @@
-package parser
+package parser_test
 
 import (
 	"testing"
+	state "github.com/BlackBuck/pcom-go/state"
+	parser "github.com/BlackBuck/pcom-go/parser"
 )
 
-func testRuneParserPass(t *testing.T, input string, expected rune, parser Parser[rune]) {
-	state := NewState(input, Position{0, 1, 1})
+func testRuneParserPass(t *testing.T, input string, expected rune, parser parser.Parser[rune]) {
+	state := state.NewState(input, state.Position{Offset: 0, Line: 1, Column: 1})
 	result, err := parser.Run(state)
 
 	if err.HasError() {
@@ -18,12 +20,12 @@ func testRuneParserPass(t *testing.T, input string, expected rune, parser Parser
 }
 
 func TestRuneParser_A(t *testing.T) {
-	parser := RuneParser("char a", 'a')
+	parser := parser.RuneParser("char a", 'a')
 	testRuneParserPass(t, "abc", 'a', parser)
 }
 
 // func TestRuneParser_B(t *testing.T) {
-// 	parser := RuneParser('b')
+// 	parser := parser.RuneParser('b')
 
 // 	testRuneParserFail(t, "abc", 'a', parser)
 // }
@@ -32,10 +34,10 @@ func TestRuneParser(t *testing.T) {
 	cases := []struct {
 		input    string
 		expected rune
-		parser   Parser[rune]
+		parser   parser.Parser[rune]
 	}{
-		{"abc", 'a', RuneParser("char a", 'a')},
-		{"bcd", 'b', RuneParser("char b", 'b')},
+		{"abc", 'a', parser.RuneParser("char a", 'a')},
+		{"bcd", 'b', parser.RuneParser("char b", 'b')},
 	}
 
 	for _, c := range cases {
@@ -47,14 +49,14 @@ func TestStringParser(t *testing.T) {
 	cases := []struct {
 		input    string
 		expected string
-		parser   Parser[string]
+		parser   parser.Parser[string]
 	}{
-		{"helloworld", "hello", StringParser("string hello", "hello")},
-		{"Mr. Doofinsmurts", "Mr.", StringParser("honorific", "Mr.")},
+		{"helloworld", "hello", parser.StringParser("string hello", "hello")},
+		{"Mr. Doofinsmurts", "Mr.", parser.StringParser("honorific", "Mr.")},
 	}
 
 	for _, c := range cases {
-		res, err := c.parser.Run(NewState(c.input, Position{0, 1, 1}))
+		res, err := c.parser.Run(state.NewState(c.input, state.Position{Offset: 0, Line: 1, Column: 1}))
 
 		if err.HasError() {
 			t.Error(err.String())
@@ -69,19 +71,19 @@ func TestStringParser(t *testing.T) {
 func TestOr(t *testing.T) {
 	tests := []struct {
 		name     string
-		parser   Parser[rune]
+		parser   parser.Parser[rune]
 		input    string
 		expected rune
 	}{
 		{
 			"match first alternative",
-			Or("a or b", RuneParser("char a", 'a'), RuneParser("char b", 'b')),
+			parser.Or("a or b", parser.RuneParser("char a", 'a'), parser.RuneParser("char b", 'b')),
 			"abc",
 			'a',
 		},
 		{
 			"match second alternative",
-			Or("x or b", RuneParser("char x", 'x'), RuneParser("char b", 'b')),
+			parser.Or("x or b", parser.RuneParser("char x", 'x'), parser.RuneParser("char b", 'b')),
 			"bcd",
 			'b',
 		},
@@ -89,7 +91,7 @@ func TestOr(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			state := NewState(tt.input, Position{0, 1, 1})
+			state := state.NewState(tt.input, state.Position{Offset: 0, Line: 1, Column: 1})
 			result, err := tt.parser.Run(state)
 			if err.HasError() {
 				t.Errorf("unexpected error: %v", err)
@@ -104,13 +106,13 @@ func TestOr(t *testing.T) {
 func TestAnd(t *testing.T) {
 	tests := []struct {
 		name     string
-		parsers  []Parser[rune]
+		parsers  []parser.Parser[rune]
 		input    string
 		expected rune
 	}{
 		{
 			"match all in sequence",
-			[]Parser[rune]{Or("a or b or c", RuneParser("char a", 'a'), RuneParser("char b", 'b')), RuneParser("char c", 'c')},
+			[]parser.Parser[rune]{parser.Or("a or b or c", parser.RuneParser("char a", 'a'), parser.RuneParser("char b", 'b')), parser.RuneParser("char c", 'c')},
 			"abc",
 			'a',
 		},
@@ -118,8 +120,8 @@ func TestAnd(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			state := NewState(tt.input, Position{0, 1, 1})
-			result, err := And("And test", tt.parsers...).Run(state)
+			state := state.NewState(tt.input, state.Position{Offset: 0, Line: 1, Column: 1})
+			result, err := parser.And("And test", tt.parsers...).Run(state)
 			if err.HasError() {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -133,19 +135,19 @@ func TestAnd(t *testing.T) {
 func TestMany0(t *testing.T) {
 	tests := []struct {
 		name     string
-		parser   Parser[[]rune]
+		parser   parser.Parser[[]rune]
 		input    string
 		expected []rune
 	}{
 		{
 			"zero or more 'a'",
-			Many0("one or more a", RuneParser("char a", 'a')),
+			parser.Many0("one or more a", parser.RuneParser("char a", 'a')),
 			"aaab",
 			[]rune{'a', 'a', 'a'},
 		},
 		{
 			"zero matches",
-			Many0("x oncr more", RuneParser("char x", 'x')),
+			parser.Many0("x oncr more", parser.RuneParser("char x", 'x')),
 			"abc",
 			[]rune{},
 		},
@@ -153,7 +155,7 @@ func TestMany0(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			state := NewState(tt.input, Position{0, 1, 1})
+			state := state.NewState(tt.input, state.Position{Offset: 0, Line: 1, Column: 1})
 			result, err := tt.parser.Run(state)
 			if err.HasError() {
 				t.Errorf("unexpected error: %v", err)
@@ -173,21 +175,21 @@ func TestMany0(t *testing.T) {
 func TestMany1(t *testing.T) {
 	tests := []struct {
 		name     string
-		parser   Parser[[]rune]
+		parser   parser.Parser[[]rune]
 		input    string
 		expected []rune
 		wantErr  bool
 	}{
 		{
 			"match many a",
-			Many1("a once or more", RuneParser("char a", 'a')),
+			parser.Many1("a once or more", parser.RuneParser("char a", 'a')),
 			"aaab",
 			[]rune{'a', 'a', 'a'},
 			false,
 		},
 		{
 			"no match error",
-			Many1("x once or more", RuneParser("char x", 'x')),
+			parser.Many1("x once or more", parser.RuneParser("char x", 'x')),
 			"abc",
 			nil,
 			true,
@@ -196,7 +198,7 @@ func TestMany1(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			state := NewState(tt.input, Position{0, 1, 1})
+			state := state.NewState(tt.input, state.Position{Offset: 0, Line: 1, Column: 1})
 			result, err := tt.parser.Run(state)
 			if tt.wantErr {
 				if !err.HasError() {
@@ -222,21 +224,21 @@ func TestMany1(t *testing.T) {
 func TestBetween(t *testing.T) {
 	tests := []struct {
 		name     string
-		parser   Parser[rune]
+		parser   parser.Parser[rune]
 		input    string
 		expected rune
 		wantErr  bool
 	}{
 		{
 			"match between parentheses",
-			Between("x in brackets", RuneParser("bracket open", '('), RuneParser("char x", 'x'), RuneParser("bracket close", ')')),
+			parser.Between("x in brackets", parser.RuneParser("bracket open", '('), parser.RuneParser("char x", 'x'), parser.RuneParser("bracket close", ')')),
 			"(x)",
 			'x',
 			false,
 		},
 		{
 			"fail on missing close",
-			Between("x in brackets", RuneParser("bracket open", '('), RuneParser("char x", 'x'), RuneParser("bracket close", ')')),
+			parser.Between("x in brackets", parser.RuneParser("bracket open", '('), parser.RuneParser("char x", 'x'), parser.RuneParser("bracket close", ')')),
 			"(x",
 			0,
 			true,
@@ -245,7 +247,7 @@ func TestBetween(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			state := NewState(tt.input, Position{0, 1, 1})
+			state := state.NewState(tt.input, state.Position{Offset: 0, Line: 1, Column: 1})
 			result, err := tt.parser.Run(state)
 			if tt.wantErr {
 				if !err.HasError() {
@@ -264,43 +266,43 @@ func TestBetween(t *testing.T) {
 }
 
 func TestThenParser(t *testing.T) {
-	letter := RuneParser("x", 'x')
-	semicolon := RuneParser(";", ';')
-	expr := Then("x then semicolon", letter, semicolon)
+	letter := parser.RuneParser("x", 'x')
+	semicolon := parser.RuneParser(";", ';')
+	expr := parser.Then("x then semicolon", letter, semicolon)
 	tests := []struct {
 		name string
 		input string
-		expected Pair[rune, rune]
+		expected parser.Pair[rune, rune]
 		wantErr bool
 	}{
 		{
 			"Then parser test 1",
 			"x;",
-			Pair[rune, rune]{'x', ';'},
+			parser.Pair[rune, rune]{Left: 'x', Right: ';'},
 			false,
 		},
 		{
 			"Then parser test 2",
 			"x",
-			Pair[rune, rune]{},
+			parser.Pair[rune, rune]{},
 			true,
 		},
 		{
 			"Then parser test 3",
 			"\n",
-			Pair[rune, rune]{},
+			parser.Pair[rune, rune]{},
 			true,
 		},
 		{
 			"Then parser test 4",
 			"",
-			Pair[rune, rune]{},
+			parser.Pair[rune, rune]{},
 			true,
 		},
 	}
 
 	for _, test := range tests {
-		res, err := expr.Run(NewState(test.input, Position{0, 1, 1}))
+		res, err := expr.Run(state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1}))
 		if test.wantErr {
 			if !err.HasError() {
 				t.Errorf("%s failed\nexpected error, got nil\n", test.name)
@@ -318,9 +320,9 @@ func TestThenParser(t *testing.T) {
 }
 
 func TestKeepLeft(t *testing.T) {
-	letter := RuneParser("x", 'x')
-	semicolon := RuneParser(";", ';')
-	expr := KeepLeft("keep x before the semicolon", Then("x then semicolon", letter, semicolon))
+	letter := parser.RuneParser("x", 'x')
+	semicolon := parser.RuneParser(";", ';')
+	expr := parser.KeepLeft("keep x before the semicolon", parser.Then("x then semicolon", letter, semicolon))
 	tests := []struct {
 		name string
 		input string
@@ -354,7 +356,7 @@ func TestKeepLeft(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		res, err := expr.Run(NewState(test.input, Position{0, 1, 1}))
+		res, err := expr.Run(state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1}))
 		if test.wantErr {
 			if !err.HasError() {
 				t.Errorf("%s failed\nexpected error, got nil\n", test.name)
@@ -372,9 +374,9 @@ func TestKeepLeft(t *testing.T) {
 }
 
 func TestKeepRight(t *testing.T) {
-	letter := RuneParser("x", 'x')
-	semicolon := RuneParser(";", ';')
-	expr := KeepRight("keep x before the semicolon", Then("x then semicolon", letter, semicolon))
+	letter := parser.RuneParser("x", 'x')
+	semicolon := parser.RuneParser(";", ';')
+	expr := parser.KeepRight("keep x before the semicolon", parser.Then("x then semicolon", letter, semicolon))
 	tests := []struct {
 		name string
 		input string
@@ -408,7 +410,7 @@ func TestKeepRight(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		res, err := expr.Run(NewState(test.input, Position{0, 1, 1}))
+		res, err := expr.Run(state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1}))
 		if test.wantErr {
 			if !err.HasError() {
 				t.Errorf("%s failed\nexpected error, got nil\n", test.name)
@@ -426,13 +428,13 @@ func TestKeepRight(t *testing.T) {
 }
 
 func TestLazyRecursive(t *testing.T) {
-	var parens Parser[rune]
-	letter := RuneParser("x", 'x')
+	var parens parser.Parser[rune]
+	letter := parser.RuneParser("x", 'x')
 
-	parens = Lazy("paren expr", func() Parser[rune] {
-		return Or("paren expression",
+	parens = parser.Lazy("paren expr", func() parser.Parser[rune] {
+		return parser.Or("paren expression",
 			letter,
-			Between("in parens", RuneParser("(", '('), parens, RuneParser(")", ')')),
+			parser.Between("in parens", parser.RuneParser("(", '('), parens, parser.RuneParser(")", ')')),
 		)
 	})
 
@@ -449,7 +451,7 @@ func TestLazyRecursive(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		res, err := parens.Run(NewState(tt.input, Position{0, 1, 1}))
+		res, err := parens.Run(state.NewState(tt.input, state.Position{Offset: 0, Line: 1, Column: 1}))
 		if tt.wantErr {
 			if !err.HasError() {
 				t.Errorf("expected error, got result: %v", res.Value)
