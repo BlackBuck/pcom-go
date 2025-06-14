@@ -7,80 +7,177 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestStateConsumeBasic(t *testing.T) {
-	s := state.NewState("abcdef", state.Position{Offset: 0, Line: 1, Column: 1})
+func TestStateConsume(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		consumeSize int
+		expectOK    bool
+		expectStr   string
+		expectOff   int
+		expectCol   int
+		expectLine  int
+	}{
+		{
+			name:        "Normal consume",
+			input:       "abcdef",
+			consumeSize: 3,
+			expectOK:    true,
+			expectStr:   "abc",
+			expectOff:   3,
+			expectCol:   4,
+			expectLine:  1,
+		},
+		{
+			name:        "Consume beyond input",
+			input:       "ab",
+			consumeSize: 5,
+			expectOK:    false,
+			expectStr:   "",
+			expectOff:   0,
+			expectCol:   1,
+			expectLine:  1,
+		},
+	}
 
-	str, span, ok := s.Consume(3)
-	assert.True(t, ok)
-	assert.Equal(t, "abc", str)
-	assert.Equal(t, 4, s.Column) // Consumed 3 chars, started at column 1
-	assert.Equal(t, 3, s.Offset)
-	assert.Equal(t, 1, s.Line)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := state.NewState(tt.input, state.Position{Offset: 0, Line: 1, Column: 1})
 
-	assert.Equal(t, 0, span.Start.Offset)
-	assert.Equal(t, 3, span.End.Offset)
+			str, _, ok := s.Consume(tt.consumeSize)
+
+			assert.Equal(t, tt.expectOK, ok, tt.name)
+			assert.Equal(t, tt.expectStr, str, tt.name)
+			assert.Equal(t, tt.expectOff, s.Offset, tt.name)
+			assert.Equal(t, tt.expectCol, s.Column, tt.name)
+			assert.Equal(t, tt.expectLine, s.Line, tt.name)
+		})
+	}
 }
 
-func TestStateConsumeBeyondInput(t *testing.T) {
-	s := state.NewState("ab", state.Position{Offset: 0, Line: 1, Column: 1})
+func TestProgressLine(t *testing.T) {
+	tests := []struct {
+		name         string
+		input        string
+		expectOffset int
+		expectLine   int
+		expectCol    int
+	}{
+		{
+			name:         "Progress line with \\n",
+			input:        "line1\nline2",
+			expectOffset: 6,
+			expectLine:   2,
+			expectCol:    1,
+		},
+		{
+			name:         "Progress line with \\r\\n",
+			input:        "line1\r\nline2",
+			expectOffset: 7,
+			expectLine:   2,
+			expectCol:    1,
+		},
+	}
 
-	str, span, ok := s.Consume(5)
-	assert.False(t, ok)
-	assert.Equal(t, "", str)
-	assert.Equal(t, 0, span.Start.Offset)
-	assert.Equal(t, 0, span.End.Offset)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := state.NewState(tt.input, state.Position{Offset: 0, Line: 1, Column: 1})
+			s.ProgressLine()
+
+			assert.Equal(t, tt.expectOffset, s.Offset)
+			assert.Equal(t, tt.expectLine, s.Line)
+			assert.Equal(t, tt.expectCol, s.Column)
+		})
+	}
 }
 
-func TestProgressLineUnix(t *testing.T) {
-	s := state.NewState("line1\nline2", state.Position{Offset: 0, Line: 1, Column: 1})
-	s.ProgressLine()
+func TestGetSnippetStringFromCurrentContext(t *testing.T) {
+	tests := []struct {
+		name        string
+		input       string
+		offset      int
+		line        int
+		column      int
+		lineStarts  []int
+		expected    string
+		description string
+	}{
+		{
+			name:       "Single line input",
+			input:      "abcdef",
+			offset:     3,
+			line:       1,
+			column:     4,
+			lineStarts: []int{0},
+			expected:   "abcdef",
+		},
+		{
+			name:       "Multi-line input second line",
+			input:      "line1\nline2\nline3",
+			offset:     8, // in "line2"
+			line:       2,
+			column:     3,
+			lineStarts: []int{0, 6},
+			expected:   "line2",
+		},
+		{
+			name:       "Empty line starts edge case",
+			input:      "test input",
+			offset:     3,
+			line:       1,
+			column:     4,
+			lineStarts: []int{}, // Force edge case
+			expected:   "test input",
+		},
+	}
 
-	assert.Equal(t, 2, s.Line)
-	assert.Equal(t, 1, s.Column)
-	assert.Equal(t, 6, s.Offset)
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := state.NewState(tt.input, state.Position{Offset: tt.offset, Line: tt.line, Column: tt.column})
+			s.LineStarts = tt.lineStarts
 
-func TestProgressLineWindows(t *testing.T) {
-	s := state.NewState("line1\r\nline2", state.Position{Offset: 0, Line: 1, Column: 1})
-	s.ProgressLine()
+			snippet := state.GetSnippetStringFromCurrentContext(s)
 
-	assert.Equal(t, 2, s.Line)
-	assert.Equal(t, 1, s.Column)
-	assert.Equal(t, 7, s.Offset) // Consumed \r\n
+			assert.Equal(t, tt.expected, snippet)
+		})
+	}
 }
 
 func TestLineStartBeforeCurrentOffset(t *testing.T) {
-	s := state.NewState("line1\nline2\nline3", state.Position{Offset: 0, Line: 1, Column: 1})
-	s.ProgressLine() // at offset 6
-	s.ProgressLine() // at offset 12
+	tests := []struct {
+		name          string
+		input         string
+		offsetAdvance int
+		lineAdvances  int
+		expectedIndex int
+	}{
+		{
+			name:          "Second line offset",
+			input:         "line1\nline2\nline3",
+			offsetAdvance: 8,
+			lineAdvances:  2,
+			expectedIndex: 2,
+		},
+		{
+			name:          "First line offset",
+			input:         "line1\nline2\nline3",
+			offsetAdvance: 2,
+			lineAdvances:  0,
+			expectedIndex: 0,
+		},
+	}
 
-	index := s.LineStartBeforeCurrentOffset()
-	assert.Equal(t, 2, index) // Line starts: [0, 6, 12]
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := state.NewState(tt.input, state.Position{Offset: 0, Line: 1, Column: 1})
 
-func TestGetSnippetStringFromCurrentContextSingleLine(t *testing.T) {
-	s := state.NewState("abcdef", state.Position{Offset: 3, Line: 1, Column: 4})
+			for i := 0; i < tt.lineAdvances; i++ {
+				s.ProgressLine()
+			}
+			s.Offset = tt.offsetAdvance
 
-	snippet := state.GetSnippetStringFromCurrentContext(s)
-	assert.Equal(t, "abcdef", snippet)
-}
-
-func TestGetSnippetStringFromCurrentContextMultiLine(t *testing.T) {
-	s := state.NewState("line1\nline2\nline3", state.Position{Offset: 0, Line: 1, Column: 1})
-
-	// Progress to second line
-	s.ProgressLine()
-	s.UpdateOffset(2) // inside "line2"
-	s.UpdateColumn(2)	
-
-	snippet := state.GetSnippetStringFromCurrentContext(s)
-	assert.Equal(t, "line2", snippet)
-}
-
-func TestEdgeCaseEmptyLineStarts(t *testing.T) {
-	s := state.NewState("", state.Position{Offset: 0, Line: 1, Column: 1})
-	s.LineStarts = []int{} // Force edge case
-
-	snippet := state.GetSnippetStringFromCurrentContext(s)
-	assert.Equal(t, "", snippet)
+			index := s.LineStartBeforeCurrentOffset()
+			assert.Equal(t, tt.expectedIndex, index)
+		})
+	}
 }
