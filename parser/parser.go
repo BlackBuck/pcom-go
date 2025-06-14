@@ -31,13 +31,13 @@ func RuneParser(label string, c rune) Parser[rune] {
 	return Parser[rune]{
 		Run: func(curState state.State) (Result[rune], Error) {
 			if !curState.InBounds(curState.Offset) {
-
 				return Result[rune]{}, Error{
 					Message:  "Reached the end of file while parsing",
 					Expected: string(c),
 					Got:      "EOF",
 					Snippet:  state.GetSnippetStringFromCurrentContext(curState),
 					Position: state.NewPositionFromState(curState),
+					Cause: nil,
 				}
 			}
 			if curState.Input[curState.Offset] == byte(c) {
@@ -58,6 +58,7 @@ func RuneParser(label string, c rune) Parser[rune] {
 				Got:      string(curState.Input[curState.Offset]),
 				Snippet:  state.GetSnippetStringFromCurrentContext(curState),
 				Position: state.NewPositionFromState(curState),
+				Cause: nil,
 			}
 		},
 		Label: label,
@@ -75,6 +76,7 @@ func StringParser(label string, s string) Parser[string] {
 					Got:      "EOF",
 					Snippet:  state.GetSnippetStringFromCurrentContext(curState),
 					Position: state.NewPositionFromState(curState),
+					Cause: nil,
 				}
 			}
 
@@ -90,6 +92,7 @@ func StringParser(label string, s string) Parser[string] {
 					Snippet:  state.GetSnippetStringFromCurrentContext(curState),
 					Got:      curState.Input[curState.Offset : curState.Offset+len(s)],
 					Position: state.NewPositionFromState(curState),
+					Cause: nil,
 				}
 			}
 
@@ -107,8 +110,6 @@ func StringParser(label string, s string) Parser[string] {
 		Label: label,
 	}
 }
-
-//TODO: Handle empty arrays for empty Parser[T] arrays as well
 
 // the OR combinator
 func Or[T any](label string, parsers ...Parser[T]) Parser[T] {
@@ -130,6 +131,7 @@ func Or[T any](label string, parsers ...Parser[T]) Parser[T] {
 				Got:      lastErr.Got,
 				Snippet:  state.GetSnippetStringFromCurrentContext(curState),
 				Position: lastErr.Position,
+				Cause: &lastErr,
 			}
 		},
 		Label: label,
@@ -150,6 +152,7 @@ func And[T any](label string, parsers ...Parser[T]) Parser[T] {
 						Got:      err.Got,
 						Snippet:  state.GetSnippetStringFromCurrentContext(curState),
 						Position: err.Position,
+						Cause: &err,
 					}
 				}
 				lastRes = res
@@ -192,10 +195,12 @@ func Many1[T any](label string, p Parser[T]) Parser[[]T] {
 		Run: func(curState state.State) (Result[[]T], Error) {
 			var results []T
 			originalState := curState
+			var lastErr Error
 			for {
 				res, err := p.Run(curState)
 				if err.HasError() {
-					break
+					lastErr = err
+					break	
 				}
 				curState = res.NextState
 				results = append(results, res.Value)
@@ -217,6 +222,7 @@ func Many1[T any](label string, p Parser[T]) Parser[[]T] {
 				Got:      fmt.Sprintf("<%s> zero times", p.Label),
 				Snippet:  state.GetSnippetStringFromCurrentContext(curState),
 				Position: state.NewPositionFromState(curState),
+				Cause: &lastErr,
 			}
 		},
 		Label: label,
@@ -229,7 +235,7 @@ func Optional[T any](label string, p Parser[T]) Parser[T] {
 			res, err := p.Run(curState)
 			if err.HasError() {
 				return Result[T]{
-					NextState: curState,
+					NextState: curState, // TODO: should I return this????
 				}, Error{}
 			}
 
@@ -253,6 +259,7 @@ func Sequence[T any](label string, parsers []Parser[T]) Parser[T] {
 						Got:      err.Got,
 						Snippet:  state.GetSnippetStringFromCurrentContext(curState),
 						Position: state.NewPositionFromState(curState),
+						Cause: &err,
 					}
 				}
 				ret = res
@@ -274,6 +281,7 @@ func Map[A, B any](label string, p1 Parser[A], f func(A) B) Parser[B] {
 					Got:      err.Got,
 					Snippet:  err.Snippet,
 					Position: err.Position,
+					Cause: &err,
 				}
 			}
 
@@ -301,6 +309,7 @@ func Then[A, B any](label string, p1 Parser[A], p2 Parser[B]) Parser[Pair[A, B]]
 					Got:      err.Got,
 					Snippet:  err.Snippet,
 					Position: err.Position,
+					Cause: &err,
 				}
 			}
 
@@ -312,6 +321,7 @@ func Then[A, B any](label string, p1 Parser[A], p2 Parser[B]) Parser[Pair[A, B]]
 					Got:      err.Got,
 					Snippet:  err.Snippet,
 					Position: err.Position,
+					Cause: &err,
 				}
 			}
 
@@ -338,6 +348,7 @@ func KeepLeft[A, B any](label string, p Parser[Pair[A, B]]) Parser[A] {
 					Expected: err.Expected,
 					Got:      err.Got,
 					Position: err.Position,
+					Cause: &err,
 				}
 			}
 
@@ -361,6 +372,7 @@ func KeepRight[A, B any](label string, p Parser[Pair[A, B]]) Parser[B] {
 					Expected: err.Expected,
 					Got:      err.Got,
 					Position: err.Position,
+					Cause: &err,
 				}
 			}
 
@@ -387,6 +399,7 @@ func Between[L, C, R any](label string, open Parser[L], content Parser[C], close
 					Expected: err.Expected,
 					Got:      err.Got,
 					Position: err.Position,
+					Cause: &err,
 				}
 			}
 

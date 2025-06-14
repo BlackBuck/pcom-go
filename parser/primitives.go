@@ -52,16 +52,15 @@ func CharWhere(predicate func(rune) bool, label string) Parser[rune] {
 					},
 				}, Error{}
 			}
-			lastLineStart := curState.LineStartBeforeCurrentOffset()
 			return Result[rune]{}, Error{
 				Message:  "Char parser with predicate failed.",
 				Expected: label,
 				Got:      string(r),
-				Snippet:  curState.Input[curState.LineStarts[lastLineStart]:curState.LineStarts[min(len(curState.LineStarts)-1, lastLineStart+1)]],
+				Snippet:  state.GetSnippetStringFromCurrentContext(curState),
 				Position: state.NewPositionFromState(curState),
 			}
 		},
-		Label: fmt.Sprintf("Char where <%s>", label),
+		Label: label,
 	}
 }
 

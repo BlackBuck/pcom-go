@@ -1,6 +1,8 @@
 package state
 
 import (
+	"fmt"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -18,7 +20,24 @@ type State struct {
 }
 
 func NewState(input string, position Position) State {
-	return State{input, position.Offset, position.Line, position.Column, []int{0}}
+	// precalculate LineStarts
+	lineStarts := []int{0}
+	for i := 0; i < len(input); {
+		if input[i] == '\r' && (i+1 < len(input) && input[i] == '\n') {
+			i += 2
+			lineStarts = append(lineStarts, i)
+		} else if input[i] == '\n'{
+			i += 1
+			lineStarts = append(lineStarts, i)
+		} else {
+			i += 1
+		}
+	}
+	if len(input) == 0 {
+		return State{input, position.Offset, position.Line, position.Column, []int{}}
+	}
+
+	return State{input, position.Offset, position.Line, position.Column, lineStarts}
 }
 
 func (s *State) InBounds(offset int) bool {
@@ -79,13 +98,18 @@ func (s *State) UpdateOffset(n int) {
 }
 
 func (s *State) ProgressLine() {
+	// if called before line ends, go to that index
+	// before updating line
+	for s.InBounds(s.Offset) && !isCRLF(s) && s.Input[s.Offset] != '\n' {
+		s.Offset += 1
+	}
+
 	// CR|LF
 	if isCRLF(s) {
 		s.UpdateOffset(2)
 	} else {
 		s.UpdateOffset(1)
 	}
-	s.LineStarts = append(s.LineStarts, s.Offset)
 	s.Line += 1
 	s.Column = 1
 }
@@ -94,27 +118,36 @@ func (s *State) LineStartBeforeCurrentOffset() int {
 	lo, hi := 0, len(s.LineStarts)-1
 	var mid int
 	for lo < hi {
-		mid = (hi + lo) / 2
-
+		mid = lo + (hi - lo + 1)/2
 		if s.LineStarts[mid] == s.Offset {
 			return mid
 		} else if s.LineStarts[mid] > s.Offset {
 			hi = mid - 1
 		} else {
-			lo = mid + 1
+			lo = mid
 		}
 	}
 
-	return hi
+	return lo
 }
 
 func GetSnippetStringFromCurrentContext(s State) string {
-	if len(s.LineStarts) <= 1 {
-		return s.Input[:min(len(s.Input), s.Column)]
+	if len(s.LineStarts) == 0 {
+		return ""
+	}
+	currentLineIndex := s.LineStartBeforeCurrentOffset()
+	lineStartOffset := s.LineStarts[currentLineIndex]
+
+	var lineEndOffset int
+	if currentLineIndex+1 >= len(s.LineStarts) {
+		lineEndOffset = len(s.Input)
+	} else {
+		lineEndOffset = s.LineStarts[currentLineIndex+1]
 	}
 
-	lastLine := s.LineStartBeforeCurrentOffset()
-	return s.Input[s.LineStarts[lastLine]:s.LineStarts[min(len(s.LineStarts)-1, lastLine+1)]]
+	lineContent := s.Input[lineStartOffset:lineEndOffset]
+	fmt.Println("line content: ", lineContent)
+	return strings.TrimRight(lineContent, "\r\n")
 }
 
 func isCRLF(s *State) bool {
