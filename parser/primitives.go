@@ -2,17 +2,17 @@ package parser
 
 import (
 	"fmt"
+	state "github.com/BlackBuck/pcom-go/state"
 	"strings"
 	"unicode/utf8"
-	state "github.com/BlackBuck/pcom-go/state"
 )
 
 func Digit() Parser[rune] {
-	return CharWhere(func(r rune) bool {return r >= '0' && r <= '9'}, "Digit parser")
+	return CharWhere(func(r rune) bool { return r >= '0' && r <= '9' }, "Digit parser")
 }
 
 func Alpha() Parser[rune] {
-	return CharWhere(func(r rune) bool {return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')}, "Alphabet parser")
+	return CharWhere(func(r rune) bool { return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') }, "Alphabet parser")
 }
 
 func AlphaNum() Parser[rune] {
@@ -30,12 +30,11 @@ func CharWhere(predicate func(rune) bool, label string) Parser[rune] {
 	return Parser[rune]{
 		Run: func(curState state.State) (Result[rune], Error) {
 			if !curState.InBounds(curState.Offset) {
-				lastLineStart := curState.LineStartBeforeCurrentOffset()
 				return Result[rune]{}, Error{
 					Message:  "Char parser with predicate failed.",
 					Expected: label,
 					Got:      "EOF",
-					Snippet:  curState.Input[curState.LineStarts[lastLineStart]:curState.LineStarts[min(len(curState.LineStarts)-1, lastLineStart+1)]],
+					Snippet:  state.GetSnippetStringFromCurrentContext(curState),
 					Position: state.NewPositionFromState(curState),
 				}
 			}
@@ -46,7 +45,7 @@ func CharWhere(predicate func(rune) bool, label string) Parser[rune] {
 				newState.Consume(size)
 				return Result[rune]{
 					Value:     r,
-					NextState: curState,
+					NextState: newState,
 					Span: state.Span{
 						Start: state.NewPositionFromState(curState),
 						End:   state.NewPositionFromState(newState),

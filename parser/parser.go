@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"sync"
 
 	state "github.com/BlackBuck/pcom-go/state"
 )
@@ -227,7 +228,9 @@ func Optional[T any](label string, p Parser[T]) Parser[T] {
 		Run: func(curState state.State) (Result[T], Error) {
 			res, err := p.Run(curState)
 			if err.HasError() {
-				return Result[T]{}, Error{}
+				return Result[T]{
+					NextState: curState,
+				}, Error{}
 			}
 
 			return res, Error{}
@@ -394,17 +397,15 @@ func Between[L, C, R any](label string, open Parser[L], content Parser[C], close
 }
 
 func Lazy[T any](label string, f func() Parser[T]) Parser[T] {
-	var memo *Parser[T] // cached result
+	var p Parser[T]
+	var once sync.Once // thread-safe Lazy init
 
 	return Parser[T]{
-		Run: func(curState state.State) (result Result[T], error Error) {
-			// lazily initialize once
-			if memo == nil {
-				p := f()
-				memo = &p
-			}
-
-			return memo.Run(curState)
+		Run: func(curState state.State) (Result[T], Error) {
+			once.Do(func() {
+				p = f()
+			})
+			return p.Run(curState)
 		},
 		Label: label,
 	}

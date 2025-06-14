@@ -1,9 +1,9 @@
 package parser
 
 import (
-	"testing"
 	parser "github.com/BlackBuck/pcom-go/parser"
 	state "github.com/BlackBuck/pcom-go/state"
+	"testing"
 )
 
 func TestWhitespace(t *testing.T) {

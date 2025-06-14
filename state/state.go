@@ -2,8 +2,8 @@ package state
 
 import (
 	"unicode/utf8"
-
 )
+
 type Span struct {
 	Start Position
 	End   Position
@@ -109,7 +109,7 @@ func (s *State) LineStartBeforeCurrentOffset() int {
 }
 
 func GetSnippetStringFromCurrentContext(s State) string {
-	if len(s.LineStarts) == 1 {
+	if len(s.LineStarts) <= 1 {
 		return s.Input[:min(len(s.Input), s.Column)]
 	}
 
