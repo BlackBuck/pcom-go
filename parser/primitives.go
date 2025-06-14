@@ -8,25 +8,11 @@ import (
 )
 
 func Digit() Parser[rune] {
-	var ret []Parser[rune]
-	for r := '0'; r <= '9'; r++ {
-		ret = append(ret, RuneParser(fmt.Sprintf("Digit %s", string(r)), r))
-	}
-
-	return Or("Digits", ret...)
+	return CharWhere(func(r rune) bool {return r >= '0' && r <= '9'}, "Digit parser")
 }
 
 func Alpha() Parser[rune] {
-	var ret []Parser[rune]
-	for r := 'A'; r <= 'Z'; r++ {
-		ret = append(ret, RuneParser(fmt.Sprintf("char %s", string(r)), r))
-	}
-
-	for r := 'a'; r <= 'z'; r++ {
-		ret = append(ret, RuneParser(fmt.Sprintf("char %s", string(r)), r))
-	}
-
-	return Or("Alphabet", ret...)
+	return CharWhere(func(r rune) bool {return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z')}, "Alphabet parser")
 }
 
 func AlphaNum() Parser[rune] {
