@@ -176,7 +176,7 @@ go test ./...
 * JSON and DSL grammar examples
 * CLI tool for file parsing and AST output
 * Memoization and packrat parsing
-* Performance benchmarks
+* Performance benchmarks(WIP)
 
 ---
 
