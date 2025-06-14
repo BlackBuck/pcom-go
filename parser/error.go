@@ -13,7 +13,7 @@ type Error struct {
 	Got      string
 	Snippet  string
 	Position state.Position
-	Cause 	 *Error
+	Cause    *Error
 }
 
 func (e *Error) HasError() bool {
@@ -41,7 +41,7 @@ func (e *Error) FullTrace() string {
 			color.HiGreenString(fmt.Sprintf("Expected: %s", current.Expected)),
 			color.HiRedString(fmt.Sprintf("Got: %s", current.Got)),
 		)
-		current = e.Cause	
+		current = e.Cause
 	}
 
 	return trace

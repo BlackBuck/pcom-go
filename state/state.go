@@ -1,9 +1,7 @@
 package state
 
 import (
-	"fmt"
 	"strings"
-	"unicode/utf8"
 )
 
 type Span struct {
@@ -26,7 +24,7 @@ func NewState(input string, position Position) State {
 		if input[i] == '\r' && (i+1 < len(input) && input[i] == '\n') {
 			i += 2
 			lineStarts = append(lineStarts, i)
-		} else if input[i] == '\n'{
+		} else if input[i] == '\n' {
 			i += 1
 			lineStarts = append(lineStarts, i)
 		} else {
@@ -59,23 +57,20 @@ func (s *State) Consume(n int) (string, Span, bool) {
 	consumed := 0
 
 	for consumed < n && s.InBounds(end) {
-		r, size := utf8.DecodeRuneInString(s.Input[end:])
-
-		if r == utf8.RuneError && size == 1 {
-			return "", Span{}, false
-		}
-
-		if isNewLineChar(r) {
+		r := s.Input[end]
+		if isNewLineChar(rune(r)) {
 			s.ProgressLine()
 		} else {
 			s.UpdateColumn(1)
 		}
 
 		consumed += 1
-		end += size
+		end += 1
 	}
 
 	if consumed < n {
+		// re-trace back to original position
+		s.UpdatePosition(startPos)
 		return "", Span{}, false
 	}
 
@@ -116,37 +111,50 @@ func (s *State) ProgressLine() {
 
 func (s *State) LineStartBeforeCurrentOffset() int {
 	lo, hi := 0, len(s.LineStarts)-1
-	var mid int
-	for lo < hi {
-		mid = lo + (hi - lo + 1)/2
+
+	for lo <= hi {
+		mid := lo + (hi-lo)/2
+
 		if s.LineStarts[mid] == s.Offset {
 			return mid
-		} else if s.LineStarts[mid] > s.Offset {
-			hi = mid - 1
+		} else if s.LineStarts[mid] < s.Offset {
+			lo = mid + 1
 		} else {
-			lo = mid
+			hi = mid - 1
 		}
 	}
 
-	return lo
+	return hi
 }
 
 func GetSnippetStringFromCurrentContext(s State) string {
+	// If LineStarts is empty, fall back to entire input
 	if len(s.LineStarts) == 0 {
-		return ""
+		return s.Input
 	}
+
 	currentLineIndex := s.LineStartBeforeCurrentOffset()
+	if currentLineIndex < 0 { // offset is before the start
+		currentLineIndex = 0
+	}
+
 	lineStartOffset := s.LineStarts[currentLineIndex]
 
 	var lineEndOffset int
-	if currentLineIndex+1 >= len(s.LineStarts) {
+	// Search for the next newline after the current offset
+	for i := lineStartOffset; i < len(s.Input); i++ {
+		if s.Input[i] == '\n' || s.Input[i] == '\r' {
+			lineEndOffset = i
+			break
+		}
+	}
+
+	// If no newline found, set to end of input
+	if lineEndOffset == 0 {
 		lineEndOffset = len(s.Input)
-	} else {
-		lineEndOffset = s.LineStarts[currentLineIndex+1]
 	}
 
 	lineContent := s.Input[lineStartOffset:lineEndOffset]
-	fmt.Println("line content: ", lineContent)
 	return strings.TrimRight(lineContent, "\r\n")
 }
 
