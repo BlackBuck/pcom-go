@@ -3,8 +3,8 @@ package parser_bench
 import (
 	"testing"
 
-	state "github.com/BlackBuck/pcom-go/state"
 	parser "github.com/BlackBuck/pcom-go/parser"
+	state "github.com/BlackBuck/pcom-go/state"
 )
 
 func BenchmarkDigit(b *testing.B) {
