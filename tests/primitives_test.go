@@ -1,9 +1,11 @@
 package parser
 
 import (
+	"testing"
+
 	parser "github.com/BlackBuck/pcom-go/parser"
 	state "github.com/BlackBuck/pcom-go/state"
-	"testing"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestWhitespace(t *testing.T) {
@@ -330,4 +332,57 @@ func TestStringCI(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestLexeme(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		parser   parser.Parser[string]
+		expected string
+		expPos state.Position
+		hasErr   bool
+	}{
+		{
+			"Lexeme test 1",
+			"1 + 2",
+			parser.Lexeme(parser.StringCI("1")),
+			"1",
+			state.Position{Offset: 2, Line: 1, Column: 3},
+			false,
+		},
+		{
+			"Lexeme test 2",
+			"abcd efgh",
+			parser.Lexeme(parser.StringCI("abcd")),
+			"abcd",
+			state.Position{Offset: 5, Line: 1, Column: 6},
+			false,
+		},
+		{
+			"Lexeme test 3",
+			"abcd \nefgh",
+			parser.Lexeme(parser.StringCI("abcd")),
+			"abcd",
+			state.Position{Offset: 5, Line: 1, Column: 6},
+			false,	
+		},
+	}
+
+	for _, test := range tests {
+		res, err := test.parser.Run(state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1}))
+
+		if test.hasErr {
+			if !err.HasError() {
+				t.Errorf("%s failed\nExpected: error\nGot: %v\n", test.name, res.Value)
+			}
+		} else {
+			assert.False(t, err.HasError(), test.name)
+			assert.Equal(t, test.expected, res.Value, test.name)
+			assert.Equal(t, test.expPos.Offset, res.NextState.Offset, test.name)
+			assert.Equal(t, test.expPos.Line, res.NextState.Line, test.name)
+			assert.Equal(t, test.expPos.Column, res.NextState.Column, test.name)
+		}
+	}
+
 }

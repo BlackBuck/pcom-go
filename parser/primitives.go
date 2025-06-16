@@ -158,7 +158,19 @@ func Lexeme[T any](p Parser[T]) Parser[T] {
 			if err.HasError() {
 				return res, err
 			}
-			_, _ = Whitespace().Run(res.NextState) // consume trailing space
+			r, err := Whitespace().Run(res.NextState) // consume trailing space
+
+			if !err.HasError() {
+				return Result[T]{
+					Value:     res.Value,
+					NextState: r.NextState,
+					Span: state.Span{
+						Start: res.Span.Start,
+						End:   r.Span.End,
+					},
+				}, Error{}
+			}
+
 			return res, Error{}
 		},
 	}
