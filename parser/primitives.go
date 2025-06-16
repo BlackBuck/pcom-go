@@ -7,14 +7,17 @@ import (
 	"unicode/utf8"
 )
 
+// Digit parses a single digit.
 func Digit() Parser[rune] {
 	return CharWhere(func(r rune) bool { return r >= '0' && r <= '9' }, "Digit parser")
 }
 
+// Alphabet parses the letters a-z and A-Z.
 func Alpha() Parser[rune] {
 	return CharWhere(func(r rune) bool { return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') }, "Alphabet parser")
 }
 
+// AlphaNum parses alphanumeric values (single rune only)
 func AlphaNum() Parser[rune] {
 	alpha := Alpha()
 	num := Digit()
@@ -22,10 +25,12 @@ func AlphaNum() Parser[rune] {
 	return Or("Alphanumeric", []Parser[rune]{alpha, num}...)
 }
 
+// Parse a whitespace
 func Whitespace() Parser[rune] {
 	return RuneParser("whitespace", ' ')
 }
 
+// CharWhere parses runes that satisfy a predicate
 func CharWhere(predicate func(rune) bool, label string) Parser[rune] {
 	return Parser[rune]{
 		Run: func(curState state.State) (Result[rune], Error) {
@@ -64,7 +69,7 @@ func CharWhere(predicate func(rune) bool, label string) Parser[rune] {
 	}
 }
 
-// case-insensitive string matching
+// StringCI performs case-insensitive string matching.
 func StringCI(s string) Parser[string] {
 	lower := strings.ToLower(s)
 	return Parser[string]{
@@ -107,6 +112,7 @@ func StringCI(s string) Parser[string] {
 	}
 }
 
+// OneOf parses any one of the runes in the string.
 func OneOf(chars string) Parser[rune] {
 	set := make(map[rune]bool)
 	for _, c := range chars {
@@ -118,7 +124,7 @@ func OneOf(chars string) Parser[rune] {
 	}, fmt.Sprintf("one of <%s>", chars))
 }
 
-// print trace every time it runs
+// Debug prints the trace every time it runs.
 func Debug[T any](p Parser[T], name string) Parser[T] {
 	return Parser[T]{
 		Run: func(curState state.State) (result Result[T], error Error) {
@@ -131,7 +137,7 @@ func Debug[T any](p Parser[T], name string) Parser[T] {
 	}
 }
 
-// don't consume state on failing
+// Try doesn't consume the state if the parser fails.
 func Try[T any](p Parser[T]) Parser[T] {
 	return Parser[T]{
 		Run: func(curState state.State) (result Result[T], error Error) {
