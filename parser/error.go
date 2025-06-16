@@ -13,6 +13,7 @@ type Error struct {
 	Got      string
 	Snippet  string
 	Position state.Position
+	Cause    *Error
 }
 
 func (e *Error) HasError() bool {
@@ -22,14 +23,28 @@ func (e *Error) HasError() bool {
 func (e *Error) String() string {
 	res := ""
 	if e.HasError() {
-		res = color.RedString(e.Message + "\n")
-		res += color.RedString(fmt.Sprintf("Error occurred at line %d, column %d, offset %d\n", e.Position.Line, e.Position.Column, e.Position.Offset))
-		res += color.HiWhiteString(e.FormattedSnippet())
-		res += color.HiGreenString(fmt.Sprintf("Expected value: <%s>\t", e.Expected))
-		res += color.HiRedString(fmt.Sprintf("Instead Got: <%s>\n", e.Got))
+		res += e.FullTrace()
 	}
 
 	return res
+}
+
+func (e *Error) FullTrace() string {
+	trace := ""
+	current := e
+	for current != nil {
+		trace += fmt.Sprintf(
+			"%s\nAt: %s\n%s\n%s\t%s",
+			color.HiRedString(current.Message),
+			color.HiRedString(fmt.Sprintf("Line %d, Column %d, Offset %d", current.Position.Line, current.Position.Column, current.Position.Offset)),
+			color.HiWhiteString(current.FormattedSnippet()),
+			color.HiGreenString(fmt.Sprintf("Expected: %s", current.Expected)),
+			color.HiRedString(fmt.Sprintf("Got: %s", current.Got)),
+		)
+		current = e.Cause
+	}
+
+	return trace
 }
 
 func (e *Error) FormattedSnippet() string {

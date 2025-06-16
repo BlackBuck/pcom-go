@@ -1,9 +1,9 @@
 package parser_test
 
 import (
-	"testing"
-	state "github.com/BlackBuck/pcom-go/state"
 	parser "github.com/BlackBuck/pcom-go/parser"
+	state "github.com/BlackBuck/pcom-go/state"
+	"testing"
 )
 
 func testRuneParserPass(t *testing.T, input string, expected rune, parser parser.Parser[rune]) {
@@ -270,10 +270,10 @@ func TestThenParser(t *testing.T) {
 	semicolon := parser.RuneParser(";", ';')
 	expr := parser.Then("x then semicolon", letter, semicolon)
 	tests := []struct {
-		name string
-		input string
+		name     string
+		input    string
 		expected parser.Pair[rune, rune]
-		wantErr bool
+		wantErr  bool
 	}{
 		{
 			"Then parser test 1",
@@ -311,7 +311,7 @@ func TestThenParser(t *testing.T) {
 			if err.HasError() {
 				t.Errorf("%s failed\nExpected: %v\tGot: error\n", test.name, res.Value)
 			}
-			
+
 			if res.Value != test.expected {
 				t.Errorf("%s failed\nExpected: %v\tGot: %v\n", test.name, test.expected, res.Value)
 			}
@@ -324,10 +324,10 @@ func TestKeepLeft(t *testing.T) {
 	semicolon := parser.RuneParser(";", ';')
 	expr := parser.KeepLeft("keep x before the semicolon", parser.Then("x then semicolon", letter, semicolon))
 	tests := []struct {
-		name string
-		input string
+		name     string
+		input    string
 		expected rune
-		wantErr bool
+		wantErr  bool
 	}{
 		{
 			"Then parser test 1",
@@ -365,7 +365,7 @@ func TestKeepLeft(t *testing.T) {
 			if err.HasError() {
 				t.Errorf("%s failed\nExpected: %v\tGot: error\n", test.name, res.Value)
 			}
-			
+
 			if res.Value != test.expected {
 				t.Errorf("%s failed\nExpected: %v\tGot: %v\n", test.name, test.expected, res.Value)
 			}
@@ -378,10 +378,10 @@ func TestKeepRight(t *testing.T) {
 	semicolon := parser.RuneParser(";", ';')
 	expr := parser.KeepRight("keep x before the semicolon", parser.Then("x then semicolon", letter, semicolon))
 	tests := []struct {
-		name string
-		input string
+		name     string
+		input    string
 		expected rune
-		wantErr bool
+		wantErr  bool
 	}{
 		{
 			"Then parser test 1",
@@ -419,7 +419,7 @@ func TestKeepRight(t *testing.T) {
 			if err.HasError() {
 				t.Errorf("%s failed\nExpected: %v\tGot: error\n", test.name, res.Value)
 			}
-			
+
 			if res.Value != test.expected {
 				t.Errorf("%s failed\nExpected: %v\tGot: %v\n", test.name, test.expected, res.Value)
 			}
