@@ -2,7 +2,8 @@
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/BlackBuck/pcom-go)](https://goreportcard.com/report/github.com/BlackBuck/pcom-go)
 
-**pcom-go** is a modular, generic **parser combinator library** written in Go. Inspired by Haskell's `parsec` and Rust's `nom`, this library allows you to build complex parsers from smaller, composable units.
+**pcom-go** is a modular, generic **parser combinator library** written in Go.  
+Inspired by Haskell's `parsec` and Rust's `nom`, this library allows you to build complex parsers from smaller, composable units — now with **detailed error traces.**
 
 > Write expressive parsers for structured text, config files, DSLs, or even JSON — all in pure Go!
 
@@ -11,30 +12,63 @@
 ## Features
 
 - Generic, type-safe parser combinators using Go 1.18+
-- Precise error tracking with line, column, and snippet highlighting
+- Precise error tracking with **full trace stack, snippets, and positions**
 - Backtracking and custom error messages (`Try`, `Or`)
 - Primitives for character-level parsing (`Digit`, `Alpha`, etc.)
 - Higher-order combinators like `Many`, `Between`, `Map`, `Lazy`
-- Easy testing and benchmarking
 - CLI-friendly colored error output
+- Easy testing and benchmarking
+
+---
+
+## Quick Start
+
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/BlackBuck/pcom-go/parser"
+    "github.com/BlackBuck/pcom-go/state"
+)
+
+func main() {
+    input := "abc123"
+    s := state.NewState(input, state.Position{Offset: 0, Line: 1, Column: 1})
+
+    digit := parser.Digit()
+    alpha := parser.Alpha()
+
+    parserSequence := parser.Many1("letters", alpha)
+
+    res, err := parserSequence.Run(s)
+    if err.HasError() {
+        fmt.Println(err.FullTrace())
+        return
+    }
+
+    fmt.Printf("Parsed: %v\n", res.Value)
+}
+````
 
 ---
 
 ## Core Concepts
 
 ### `Parser[T]`
-A parser is a function that consumes input and returns a `Result[T]` or an error. You can compose them using combinators like `Or`, `Many`, and `Map`.
+
+A parser is a function that consumes input and returns a `Result[T]` or an `Error`. Parsers can be composed using combinators like `Or`, `Many`, `Map`, and more.
 
 ```go
 type Parser[T any] struct {
 	Run   func(State) (Result[T], Error)
 	Label string
 }
-````
+```
 
 ---
 
-## API Overview
+## 🛠️ API Overview
 
 ### Primitives
 
@@ -66,19 +100,24 @@ type Parser[T any] struct {
 | `Lazy(f)`                 | Allows recursion by deferring parser creation |
 | `Map(p, f)`               | Transforms parser output                      |
 | `Lexeme(p)`               | Skips trailing space after parsing `p`        |
+| `Then(p1, p2)`            | Chains parsers and returns both results       |
+| `KeepLeft(p)`             | Keeps left parser result                      |
+| `KeepRight(p)`            | Keeps right parser result                     |
+| `Debug(p, name)`          | Logs parser execution                         |
 
 ---
 
 ## Example: Arithmetic Expression Parser
 
 ```go
-num := Many1(Digit())
-plus := RuneParser('+')
-expr := Map(Sequence([]Parser[string]{
+num := parser.Many1("number", parser.Digit())
+plus := parser.RuneParser("+", '+')
+
+expr := parser.Map(parser.Sequence([]parser.Parser[string]{
     num,
-    Lexeme(plus),
+    parser.Lexeme(plus),
     num,
-}), func(v string) int {
+}), func(values string) int {
     // Simplified: parse "3 + 4" → 7
     return ...
 })
@@ -88,16 +127,30 @@ expr := Map(Sequence([]Parser[string]{
 
 ## Error Reporting Example
 
-When a parser fails, you get colored output:
+When a parser fails, you now get **full trace errors:**
 
 ```text
-Error: unexpected token at line 3, column 5, offset 42
-  2 | let x = 5
-  3 | let y = ?
-               ^
-Expected: digit
-Got: ?
+Parser: Or
+Position: 1:1
+Message: Or combinator failed
+Expected: Digit
+Got: 'a'
+Snippet: abc123
+
+Parser: DigitParser
+Position: 1:1
+Message: Failed to parse digit
+Expected: Digit
+Got: 'a'
+Snippet: abc123
 ```
+
+The trace shows:
+
+* Which parsers failed
+* The full stack of parser attempts
+* Expected vs. actual values
+* Input snippets with precise line and column positions
 
 ---
 
@@ -123,17 +176,31 @@ go test ./...
 * JSON and DSL grammar examples
 * CLI tool for file parsing and AST output
 * Memoization and packrat parsing
-* Performance benchmarks
+* Performance benchmarks(WIP)
 
 ---
 
 ## Examples
 
-Examples will be included in `/examples`:
+Example parsers (coming soon in `/examples`):
 
 * JSON parser
 * Arithmetic evaluator
 * Config file grammar
+
+---
+
+## Contributing
+
+Pull requests, issues, and suggestions are welcome!
+
+### To contribute:
+
+* Fork the repo
+* Create a new branch: `feature/my-feature`
+* Submit a pull request
+
+For major changes, please open an issue first to discuss your ideas.
 
 ---
 
