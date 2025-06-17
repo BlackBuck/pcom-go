@@ -3,8 +3,10 @@ package parser
 import (
 	"testing"
 
+
 	parser "github.com/BlackBuck/pcom-go/parser"
 	state "github.com/BlackBuck/pcom-go/state"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/assert"
 )
 

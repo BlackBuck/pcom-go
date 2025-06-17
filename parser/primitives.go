@@ -2,9 +2,10 @@ package parser
 
 import (
 	"fmt"
-	state "github.com/BlackBuck/pcom-go/state"
 	"strings"
 	"unicode/utf8"
+
+	state "github.com/BlackBuck/pcom-go/state"
 )
 
 func AnyChar() Parser[rune] {
@@ -14,13 +15,17 @@ func AnyChar() Parser[rune] {
 // Digit parses a single digit.
 func Digit() Parser[rune] {
 	return CharWhere(func(r rune) bool { return r >= '0' && r <= '9' }, "Digit parser")
+	return CharWhere(func(r rune) bool { return r >= '0' && r <= '9' }, "Digit parser")
 }
 
 // Alphabet parses the letters a-z and A-Z.
+// Alphabet parses the letters a-z and A-Z.
 func Alpha() Parser[rune] {
+	return CharWhere(func(r rune) bool { return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') }, "Alphabet parser")
 	return CharWhere(func(r rune) bool { return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') }, "Alphabet parser")
 }
 
+// AlphaNum parses alphanumeric values (single rune only)
 // AlphaNum parses alphanumeric values (single rune only)
 func AlphaNum() Parser[rune] {
 	alpha := Alpha()
@@ -30,10 +35,12 @@ func AlphaNum() Parser[rune] {
 }
 
 // Parse a whitespace
+// Parse a whitespace
 func Whitespace() Parser[rune] {
 	return RuneParser("whitespace", ' ')
 }
 
+// CharWhere parses runes that satisfy a predicate
 // CharWhere parses runes that satisfy a predicate
 func CharWhere(predicate func(rune) bool, label string) Parser[rune] {
 	return Parser[rune]{
@@ -43,6 +50,7 @@ func CharWhere(predicate func(rune) bool, label string) Parser[rune] {
 					Message:  "Char parser with predicate failed.",
 					Expected: label,
 					Got:      "EOF",
+					Snippet:  state.GetSnippetStringFromCurrentContext(curState),
 					Snippet:  state.GetSnippetStringFromCurrentContext(curState),
 					Position: state.NewPositionFromState(curState),
 				}
@@ -55,6 +63,7 @@ func CharWhere(predicate func(rune) bool, label string) Parser[rune] {
 				return Result[rune]{
 					Value:     r,
 					NextState: newState,
+					NextState: newState,
 					Span: state.Span{
 						Start: state.NewPositionFromState(curState),
 						End:   state.NewPositionFromState(newState),
@@ -66,13 +75,16 @@ func CharWhere(predicate func(rune) bool, label string) Parser[rune] {
 				Expected: label,
 				Got:      string(r),
 				Snippet:  state.GetSnippetStringFromCurrentContext(curState),
+				Snippet:  state.GetSnippetStringFromCurrentContext(curState),
 				Position: state.NewPositionFromState(curState),
 			}
 		},
 		Label: label,
+		Label: label,
 	}
 }
 
+// StringCI performs case-insensitive string matching.
 // StringCI performs case-insensitive string matching.
 func StringCI(s string) Parser[string] {
 	lower := strings.ToLower(s)
@@ -117,6 +129,7 @@ func StringCI(s string) Parser[string] {
 }
 
 // OneOf parses any one of the runes in the string.
+// OneOf parses any one of the runes in the string.
 func OneOf(chars string) Parser[rune] {
 	set := make(map[rune]bool)
 	for _, c := range chars {
@@ -128,6 +141,7 @@ func OneOf(chars string) Parser[rune] {
 	}, fmt.Sprintf("one of <%s>", chars))
 }
 
+// Debug prints the trace every time it runs.
 // Debug prints the trace every time it runs.
 func Debug[T any](p Parser[T], name string) Parser[T] {
 	return Parser[T]{
@@ -141,6 +155,7 @@ func Debug[T any](p Parser[T], name string) Parser[T] {
 	}
 }
 
+// Try doesn't consume the state if the parser fails.
 // Try doesn't consume the state if the parser fails.
 func Try[T any](p Parser[T]) Parser[T] {
 	return Parser[T]{
@@ -168,6 +183,19 @@ func Lexeme[T any](p Parser[T]) Parser[T] {
 			if err.HasError() {
 				return res, err
 			}
+			r, err := Whitespace().Run(res.NextState) // consume trailing space
+
+			if !err.HasError() {
+				return Result[T]{
+					Value:     res.Value,
+					NextState: r.NextState,
+					Span: state.Span{
+						Start: res.Span.Start,
+						End:   r.Span.End,
+					},
+				}, Error{}
+			}
+
 			r, err := Whitespace().Run(res.NextState) // consume trailing space
 
 			if !err.HasError() {
