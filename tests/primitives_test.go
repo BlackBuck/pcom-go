@@ -384,7 +384,6 @@ func TestLexeme(t *testing.T) {
 			assert.Equal(t, test.expPos.Column, res.NextState.Column, test.name)
 		}
 	}
-
 }
 
 func TestSeparatedBy(t *testing.T) {
