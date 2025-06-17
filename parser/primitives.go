@@ -7,6 +7,10 @@ import (
 	"unicode/utf8"
 )
 
+func AnyChar() Parser[rune] {
+	return CharWhere(func(r rune) bool {return true}, "Any character")
+}
+
 // Digit parses a single digit.
 func Digit() Parser[rune] {
 	return CharWhere(func(r rune) bool { return r >= '0' && r <= '9' }, "Digit parser")
@@ -179,5 +183,127 @@ func Lexeme[T any](p Parser[T]) Parser[T] {
 
 			return res, Error{}
 		},
+	}
+}
+
+func TakeWhile(label string, f func(byte) bool) Parser[string] {
+	return Parser[string]{
+		Run: func(curState state.State) (result Result[string], error Error) {
+			var ret string
+			initialPos := state.NewPositionFromState(curState)
+			for curState.InBounds(curState.Offset) && f(curState.Input[curState.Offset]) {
+				r, _, _ := curState.Consume(1)
+				ret += r
+			}
+
+			return Result[string]{
+				Value: ret,
+				NextState: curState,
+				Span: state.Span{
+					Start: initialPos,
+					End: state.NewPositionFromState(curState),
+				},
+			}, Error{}
+		},
+		Label: label,
+	}
+}
+
+func SeparatedBy[A, B any](label string, p Parser[A], delimiter Parser[B]) Parser[[]A] {
+	return Parser[[]A]{
+		Run: func(curState state.State) (result Result[[]A], error Error) {
+			var ret []A
+			initialPos := state.NewPositionFromState(curState)
+			first, err := p.Run(curState)
+			if err.HasError() {
+				return Result[[]A]{}, Error{
+					Message: "SeparatedBy failed.",
+					Expected: err.Expected,
+					Got: err.Got,
+					Position: err.Position,
+					Snippet: err.Snippet,
+					Cause: &err,
+				}
+			}
+
+			ret = append(ret, first.Value)
+			curState = first.NextState
+			for {
+				del, err := delimiter.Run(curState)
+				if err.HasError() {
+					break
+				}
+
+				res, err := p.Run(del.NextState)
+				if err.HasError() {
+					return Result[[]A]{}, Error{
+						Message:  "SeparatedBy failed after delimiter.",
+						Expected: err.Expected,
+						Got:      err.Got,
+						Position: err.Position,
+						Snippet:  err.Snippet,
+						Cause:    &err,
+					}
+				}
+				ret = append(ret, res.Value)
+				curState = res.NextState
+			}
+
+			return Result[[]A]{
+				Value: ret,
+				NextState: curState,
+				Span: state.Span{
+					Start: initialPos,
+					End: state.NewPositionFromState(curState),
+				},
+			}, Error{}
+		},
+		Label: label,
+	}
+}
+
+func ManyTill[A, B any](label string, p Parser[A], end Parser[B]) Parser[[]A] {
+	return Parser[[]A]{
+		Run: func(curState state.State) (result Result[[]A], error Error) {
+			var ret []A
+			initialPos := state.NewPositionFromState(curState)
+			for curState.InBounds(curState.Offset) {
+				_, err := end.Run(curState)
+				if !err.HasError() {
+					return Result[[]A]{
+						Value: ret,
+						NextState: curState,
+						Span: state.Span{
+							Start: initialPos,
+							End: state.NewPositionFromState(curState),
+						}, 
+					}, Error{}
+				}
+
+				res, err := p.Run(curState)
+				if err.HasError() {
+					return Result[[]A]{}, Error{
+						Message: "ManyTill parser failed.",
+						Expected: err.Expected,
+						Got: err.Got,
+						Position: err.Position,
+						Cause: &err,
+					}
+				}
+				
+				ret = append(ret, res.Value)
+				curState = res.NextState
+			}
+
+			return Result[[]A]{
+				Value: ret,
+				NextState: curState,
+				Span: state.Span{
+					Start: initialPos,
+					End: state.NewPositionFromState(curState),
+				},
+			}, Error{}
+		},
+		Label: label,
 	}
 }
