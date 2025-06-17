@@ -8,7 +8,7 @@ import (
 )
 
 func AnyChar() Parser[rune] {
-	return CharWhere(func(r rune) bool {return true}, "Any character")
+	return CharWhere(func(r rune) bool { return true }, "Any character")
 }
 
 // Digit parses a single digit.
@@ -197,11 +197,11 @@ func TakeWhile(label string, f func(byte) bool) Parser[string] {
 			}
 
 			return Result[string]{
-				Value: ret,
+				Value:     ret,
 				NextState: curState,
 				Span: state.Span{
 					Start: initialPos,
-					End: state.NewPositionFromState(curState),
+					End:   state.NewPositionFromState(curState),
 				},
 			}, Error{}
 		},
@@ -217,12 +217,12 @@ func SeparatedBy[A, B any](label string, p Parser[A], delimiter Parser[B]) Parse
 			first, err := p.Run(curState)
 			if err.HasError() {
 				return Result[[]A]{}, Error{
-					Message: "SeparatedBy failed.",
+					Message:  "SeparatedBy failed.",
 					Expected: err.Expected,
-					Got: err.Got,
+					Got:      err.Got,
 					Position: err.Position,
-					Snippet: err.Snippet,
-					Cause: &err,
+					Snippet:  err.Snippet,
+					Cause:    &err,
 				}
 			}
 
@@ -250,11 +250,11 @@ func SeparatedBy[A, B any](label string, p Parser[A], delimiter Parser[B]) Parse
 			}
 
 			return Result[[]A]{
-				Value: ret,
+				Value:     ret,
 				NextState: curState,
 				Span: state.Span{
 					Start: initialPos,
-					End: state.NewPositionFromState(curState),
+					End:   state.NewPositionFromState(curState),
 				},
 			}, Error{}
 		},
@@ -271,36 +271,36 @@ func ManyTill[A, B any](label string, p Parser[A], end Parser[B]) Parser[[]A] {
 				_, err := end.Run(curState)
 				if !err.HasError() {
 					return Result[[]A]{
-						Value: ret,
+						Value:     ret,
 						NextState: curState,
 						Span: state.Span{
 							Start: initialPos,
-							End: state.NewPositionFromState(curState),
-						}, 
+							End:   state.NewPositionFromState(curState),
+						},
 					}, Error{}
 				}
 
 				res, err := p.Run(curState)
 				if err.HasError() {
 					return Result[[]A]{}, Error{
-						Message: "ManyTill parser failed.",
+						Message:  "ManyTill parser failed.",
 						Expected: err.Expected,
-						Got: err.Got,
+						Got:      err.Got,
 						Position: err.Position,
-						Cause: &err,
+						Cause:    &err,
 					}
 				}
-				
+
 				ret = append(ret, res.Value)
 				curState = res.NextState
 			}
 
 			return Result[[]A]{
-				Value: ret,
+				Value:     ret,
 				NextState: curState,
 				Span: state.Span{
 					Start: initialPos,
-					End: state.NewPositionFromState(curState),
+					End:   state.NewPositionFromState(curState),
 				},
 			}, Error{}
 		},

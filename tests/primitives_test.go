@@ -388,7 +388,7 @@ func TestLexeme(t *testing.T) {
 }
 
 func TestSeparatedBy(t *testing.T) {
-	tests := []struct{
+	tests := []struct {
 		name     string
 		input    string
 		parser   parser.Parser[[]rune]
@@ -426,7 +426,7 @@ func TestSeparatedBy(t *testing.T) {
 			parser.SeparatedBy("digits separated by comma", parser.Digit(), parser.Lexeme(parser.RuneParser("delimiter", ','))),
 			[]rune{},
 			state.Position{},
-			true,			
+			true,
 		},
 		{
 			"SeparatedBy test 4",
@@ -476,7 +476,7 @@ func TestSeparatedBy(t *testing.T) {
 }
 
 func TestTakeWhile(t *testing.T) {
-	tests := []struct{
+	tests := []struct {
 		name     string
 		input    string
 		parser   parser.Parser[string]
@@ -487,7 +487,7 @@ func TestTakeWhile(t *testing.T) {
 		{
 			"TakeWhile test 1",
 			"abcD",
-			parser.TakeWhile("take while letter", func(b byte) bool {return b >= 'a' && b <= 'z'}),
+			parser.TakeWhile("take while letter", func(b byte) bool { return b >= 'a' && b <= 'z' }),
 			"abc",
 			state.Position{Offset: 3, Line: 1, Column: 4},
 			false,
@@ -495,7 +495,7 @@ func TestTakeWhile(t *testing.T) {
 		{
 			"TakeWhile test 2",
 			"1234a",
-			parser.TakeWhile("take while letter", func(b byte) bool {return b >= '0' && b <= '9'}),
+			parser.TakeWhile("take while letter", func(b byte) bool { return b >= '0' && b <= '9' }),
 			"1234",
 			state.Position{Offset: 4, Line: 1, Column: 5},
 			false,
@@ -503,7 +503,7 @@ func TestTakeWhile(t *testing.T) {
 		{
 			"TakeWhile test 3",
 			"1234",
-			parser.TakeWhile("take while letter", func(b byte) bool {return b >= '0' && b <= '9'}),
+			parser.TakeWhile("take while letter", func(b byte) bool { return b >= '0' && b <= '9' }),
 			"1234",
 			state.Position{Offset: 4, Line: 1, Column: 5},
 			false,
@@ -511,10 +511,10 @@ func TestTakeWhile(t *testing.T) {
 		{
 			"TakeWhile test 4",
 			"c1234",
-			parser.TakeWhile("take while letter", func(b byte) bool {return b >= '0' && b <= '9'}),
+			parser.TakeWhile("take while letter", func(b byte) bool { return b >= '0' && b <= '9' }),
 			"",
 			state.Position{Offset: 0, Line: 1, Column: 1},
-			false,			
+			false,
 		},
 	}
 
@@ -535,8 +535,8 @@ func TestTakeWhile(t *testing.T) {
 	}
 }
 
-func TestManyTill(t *testing.T)	{
-	tests := []struct{
+func TestManyTill(t *testing.T) {
+	tests := []struct {
 		name     string
 		input    string
 		parser   parser.Parser[[]rune]
@@ -574,7 +574,7 @@ func TestManyTill(t *testing.T)	{
 			parser.ManyTill("take while letter", parser.Digit(), parser.RuneParser("comma", ',')),
 			[]rune{},
 			state.Position{},
-			true,			
+			true,
 		},
 	}
 
