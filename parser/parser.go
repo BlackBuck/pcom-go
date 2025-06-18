@@ -457,3 +457,54 @@ func Lazy[T any](label string, f func() Parser[T]) Parser[T] {
 		Label: label,
 	}
 }
+
+// Chainl1 parses one or more p values separated by op, and folds them left-associatively
+func Chainl1[T any](label string, p Parser[T], op Parser[func(T, T) T]) Parser[T] {
+	return Parser[T]{
+		Run: func(curState state.State) (result Result[T], error Error) {
+			initialPos := state.NewPositionFromState(curState)
+			left, err := p.Run(curState)
+			if err.HasError() {
+				return Result[T]{}, Error{
+					Message: "Chainl1: failed to parse initial value.",
+					Expected: err.Expected,
+					Got: err.Got,
+					Position: err.Position,
+					Cause: &err,
+				}
+			}
+			
+			ass := left.Value
+			curState = left.NextState
+			for {
+				f, err := op.Run(curState)
+				if err.HasError() {
+					break
+				}
+
+				right, err := p.Run(f.NextState)
+				if err.HasError() {
+					return Result[T]{}, Error{
+						Message: "Chainl1: failed to parse right value.",
+						Expected: err.Expected,
+						Got: err.Got,
+						Position: err.Position,
+						Cause: &err,
+					}
+				}
+				ass = f.Value(ass, right.Value)
+				curState = right.NextState
+			}
+			
+			return Result[T]{
+				Value: ass,
+				NextState: curState,
+				Span: state.Span{
+					Start: initialPos,
+					End: state.NewPositionFromState(curState),
+				},
+			}, Error{}
+		},
+		Label: label,
+	}
+}
