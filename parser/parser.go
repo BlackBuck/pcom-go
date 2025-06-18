@@ -466,14 +466,14 @@ func Chainl1[T any](label string, p Parser[T], op Parser[func(T, T) T]) Parser[T
 			left, err := p.Run(curState)
 			if err.HasError() {
 				return Result[T]{}, Error{
-					Message: "Chainl1: failed to parse initial value.",
+					Message:  "Chainl1: failed to parse initial value.",
 					Expected: err.Expected,
-					Got: err.Got,
+					Got:      err.Got,
 					Position: err.Position,
-					Cause: &err,
+					Cause:    &err,
 				}
 			}
-			
+
 			ass := left.Value
 			curState = left.NextState
 			for {
@@ -485,23 +485,85 @@ func Chainl1[T any](label string, p Parser[T], op Parser[func(T, T) T]) Parser[T
 				right, err := p.Run(f.NextState)
 				if err.HasError() {
 					return Result[T]{}, Error{
-						Message: "Chainl1: failed to parse right value.",
+						Message:  "Chainl1: failed to parse right value.",
 						Expected: err.Expected,
-						Got: err.Got,
+						Got:      err.Got,
 						Position: err.Position,
-						Cause: &err,
+						Cause:    &err,
 					}
 				}
 				ass = f.Value(ass, right.Value)
 				curState = right.NextState
 			}
-			
+
 			return Result[T]{
-				Value: ass,
+				Value:     ass,
 				NextState: curState,
 				Span: state.Span{
 					Start: initialPos,
-					End: state.NewPositionFromState(curState),
+					End:   state.NewPositionFromState(curState),
+				},
+			}, Error{}
+		},
+		Label: label,
+	}
+}
+
+func Chainr1[T any](label string, p Parser[T], op Parser[func(T, T) T]) Parser[T] {
+	return Parser[T]{
+		Run: func(curState state.State) (result Result[T], error Error) {
+			var vals []T
+			var fs []func(T, T) T
+			initialPos := state.NewPositionFromState(curState)
+			leftVal, err := p.Run(curState)
+			if err.HasError() {
+				return Result[T]{}, Error{
+					Message:  "Chainr1: failed to parse initial value.",
+					Expected: err.Expected,
+					Got:      err.Got,
+					Position: err.Position,
+					Cause:    &err,
+				}
+			}
+
+			vals = append(vals, leftVal.Value)
+			curState = leftVal.NextState
+			for {
+				f, err := op.Run(curState)
+				if err.HasError() {
+					break
+				}
+
+				fs = append(fs, f.Value)
+				rightVal, err := p.Run(f.NextState)
+				if err.HasError() {
+					return Result[T]{}, Error{
+						Message:  "Chainr1: failed to parse right value.",
+						Expected: err.Expected,
+						Got:      err.Got,
+						Position: err.Position,
+						Cause:    &err,
+					}
+				}
+				vals = append(vals, rightVal.Value)
+				curState = rightVal.NextState
+			}
+
+			for len(vals) > 1 {
+				a := vals[len(vals)-1]
+				b := vals[len(vals)-2]
+				f := fs[len(fs)-1]
+				fs = fs[:len(fs)-1]
+				vals = vals[:len(vals)-2]
+				vals = append(vals, f(a, b))
+			}
+
+			return Result[T]{
+				Value:     vals[0],
+				NextState: curState,
+				Span: state.Span{
+					Start: initialPos,
+					End:   state.NewPositionFromState(curState),
 				},
 			}, Error{}
 		},
