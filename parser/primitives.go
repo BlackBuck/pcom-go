@@ -310,3 +310,32 @@ func ManyTill[A, B any](label string, p Parser[A], end Parser[B]) Parser[[]A] {
 		Label: label,
 	}
 }
+
+// Not does not consume any input. It is used to prevent any unwanted match.
+func Not[T any](label string, p Parser[T]) Parser[struct{}] {
+	return Parser[struct{}]{
+		Run: func(curState state.State) (result Result[struct{}], error Error) {
+			_, err := p.Run(curState)
+			initialPos := state.NewPositionFromState(curState)
+			if err.HasError() {
+				return Result[struct{}]{
+					Value: struct{}{},
+					NextState: curState,
+					Span: state.Span{
+						Start: initialPos,
+						End: initialPos,
+					},
+				}, Error{}
+			}
+
+			return Result[struct{}]{}, Error{
+				Message: "Unexpected match in not.",
+				Expected: "Not " + p.Label,
+				Got: p.Label,
+				Position: state.NewPositionFromState(curState),
+				Snippet: state.GetSnippetStringFromCurrentContext(curState),
+				Cause: nil,
+			}
+		},
+	}
+}	
