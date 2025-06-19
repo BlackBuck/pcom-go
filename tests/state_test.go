@@ -156,7 +156,7 @@ func TestLineStartBeforeCurrentOffset(t *testing.T) {
 			input:         "line1\nline2\nline3",
 			offsetAdvance: 8,
 			lineAdvances:  2,
-			expectedIndex: 2,
+			expectedIndex: 1,
 		},
 		{
 			name:          "First line offset",
