@@ -594,3 +594,71 @@ func TestManyTill(t *testing.T) {
 		}
 	}
 }
+
+func TestNot(t *testing.T) {
+	tests := []struct{
+		name     string
+		input    string
+		parser   parser.Parser[struct{}]
+		expected struct{}
+		expPos   state.Position
+		hasErr   bool
+	}{
+		{
+			"Not test 1",
+			"abcd",
+			parser.Not("not a digit", parser.Digit()),
+			struct{}{},
+			state.Position{Offset: 0, Line: 1, Column: 1},
+			false,
+		},
+		{
+			"Not test 2",
+			"1234",
+			parser.Not("not alphabet", parser.Alpha()),
+			struct{}{},
+			state.Position{Offset: 0, Line: 1, Column: 1},
+			false,	
+		},
+		{
+			"Not test 3",
+			"$123",
+			parser.Not("not alphabet", parser.AlphaNum()),
+			struct{}{},
+			state.Position{Offset: 0, Line: 1, Column: 1},
+			false,	
+		},
+		{
+			"Not test 4",
+			"",
+			parser.Not("not alphabet", parser.Alpha()),
+			struct{}{},
+			state.Position{Offset: 0, Line: 1, Column: 1},
+			false,	
+		},
+		{
+			"Not test 5",
+			"1234",
+			parser.Not("not alphabet", parser.AlphaNum()),
+			struct{}{},
+			state.Position{Offset: 0, Line: 1, Column: 1},
+			true,	
+		},
+	}	
+
+	for _, test := range tests {
+		res, err := test.parser.Run(state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1}))
+
+		if test.hasErr {
+			if !err.HasError() {
+				t.Errorf("%s failed\nExpected: error\nGot: %v\n", test.name, res.Value)
+			}
+		} else {
+			assert.False(t, err.HasError(), test.name)
+			assert.Equal(t, test.expected, res.Value, test.name)
+			assert.Equal(t, test.expPos.Offset, res.NextState.Offset, test.name)
+			assert.Equal(t, test.expPos.Line, res.NextState.Line, test.name)
+			assert.Equal(t, test.expPos.Column, res.NextState.Column, test.name)
+		}
+	}
+}
