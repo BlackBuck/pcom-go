@@ -29,8 +29,8 @@ func BenchmarkStringParser(b *testing.B) {
 func BenchmarkOrParser(b *testing.B) {
 	charA := parser.RuneParser("char a", 'a')
 	s := state.NewState("abcd", state.Position{Offset: 0, Line: 1, Column: 1})
-	tests := []struct{
-		name string
+	tests := []struct {
+		name   string
 		parser parser.Parser[rune]
 	}{
 		{
@@ -39,7 +39,7 @@ func BenchmarkOrParser(b *testing.B) {
 		},
 		{
 			"Or benchmark depth 2",
-			parser.Or("level 0", parser.Or("level 1", charA, charA), charA),	
+			parser.Or("level 0", parser.Or("level 1", charA, charA), charA),
 		},
 		{
 			"Or benchmark depth 3",
@@ -59,8 +59,8 @@ func BenchmarkOrParser(b *testing.B) {
 func BenchmarkAndParser(b *testing.B) {
 	charA := parser.RuneParser("char a", 'a')
 	s := state.NewState("abcd", state.Position{Offset: 0, Line: 1, Column: 1})
-	tests := []struct{
-		name string
+	tests := []struct {
+		name   string
 		parser parser.Parser[rune]
 	}{
 		{
@@ -69,7 +69,7 @@ func BenchmarkAndParser(b *testing.B) {
 		},
 		{
 			"And benchmark depth 2",
-			parser.And("level 0", parser.And("level 1", charA, charA), charA),	
+			parser.And("level 0", parser.And("level 1", charA, charA), charA),
 		},
 		{
 			"And benchmark depth 3",
@@ -115,4 +115,3 @@ func BenchmarkMany1(b *testing.B) {
 		})
 	}
 }
-

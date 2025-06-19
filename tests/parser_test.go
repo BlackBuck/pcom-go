@@ -1,9 +1,9 @@
 package parser_test
 
 import (
-	"testing"
-	state "github.com/BlackBuck/pcom-go/state"
 	parser "github.com/BlackBuck/pcom-go/parser"
+	state "github.com/BlackBuck/pcom-go/state"
+	"testing"
 )
 
 func testRuneParserPass(t *testing.T, input string, expected rune, parser parser.Parser[rune]) {
@@ -270,10 +270,10 @@ func TestThenParser(t *testing.T) {
 	semicolon := parser.RuneParser(";", ';')
 	expr := parser.Then("x then semicolon", letter, semicolon)
 	tests := []struct {
-		name string
-		input string
+		name     string
+		input    string
 		expected parser.Pair[rune, rune]
-		wantErr bool
+		wantErr  bool
 	}{
 		{
 			"Then parser test 1",
@@ -311,7 +311,7 @@ func TestThenParser(t *testing.T) {
 			if err.HasError() {
 				t.Errorf("%s failed\nExpected: %v\tGot: error\n", test.name, res.Value)
 			}
-			
+
 			if res.Value != test.expected {
 				t.Errorf("%s failed\nExpected: %v\tGot: %v\n", test.name, test.expected, res.Value)
 			}
@@ -324,10 +324,10 @@ func TestKeepLeft(t *testing.T) {
 	semicolon := parser.RuneParser(";", ';')
 	expr := parser.KeepLeft("keep x before the semicolon", parser.Then("x then semicolon", letter, semicolon))
 	tests := []struct {
-		name string
-		input string
+		name     string
+		input    string
 		expected rune
-		wantErr bool
+		wantErr  bool
 	}{
 		{
 			"Then parser test 1",
@@ -365,7 +365,7 @@ func TestKeepLeft(t *testing.T) {
 			if err.HasError() {
 				t.Errorf("%s failed\nExpected: %v\tGot: error\n", test.name, res.Value)
 			}
-			
+
 			if res.Value != test.expected {
 				t.Errorf("%s failed\nExpected: %v\tGot: %v\n", test.name, test.expected, res.Value)
 			}
@@ -378,10 +378,10 @@ func TestKeepRight(t *testing.T) {
 	semicolon := parser.RuneParser(";", ';')
 	expr := parser.KeepRight("keep x before the semicolon", parser.Then("x then semicolon", letter, semicolon))
 	tests := []struct {
-		name string
-		input string
+		name     string
+		input    string
 		expected rune
-		wantErr bool
+		wantErr  bool
 	}{
 		{
 			"Then parser test 1",
@@ -419,7 +419,7 @@ func TestKeepRight(t *testing.T) {
 			if err.HasError() {
 				t.Errorf("%s failed\nExpected: %v\tGot: error\n", test.name, res.Value)
 			}
-			
+
 			if res.Value != test.expected {
 				t.Errorf("%s failed\nExpected: %v\tGot: %v\n", test.name, test.expected, res.Value)
 			}
@@ -462,6 +462,126 @@ func TestLazyRecursive(t *testing.T) {
 			}
 			if res.Value != tt.expected {
 				t.Errorf("expected %q, got %q", tt.expected, res.Value)
+			}
+		}
+	}
+}
+
+func TestChainl1(t *testing.T) {
+	op := parser.Map("+", parser.RuneParser("+", '+'), func(r rune) func(a, b int) int { return func(a, b int) int { return a + b } })
+	val := parser.Map("Rune digit to int", parser.Digit(), func(r rune) int { return int(r - '0') })
+	chain := parser.Chainl1("Left-associative addition", val, op)
+
+	tests := []struct {
+		name     string
+		input    string
+		expected int
+		hasErr   bool
+	}{
+		{
+			"Chainl1 test 1",
+			"1+2",
+			3,
+			false,
+		},
+		{
+			"Chainl1 test 2",
+			"1+2+9",
+			12,
+			false,
+		},
+		{
+			"Chainl1 test 3",
+			"1+",
+			0,
+			true,
+		},
+		{
+			"Chainl1 test 4",
+			"+2",
+			0,
+			true,
+		},
+		{
+			"Chainl1 test 5",
+			"",
+			0,
+			true,
+		},
+	}
+
+	for _, tt := range tests {
+		res, err := chain.Run(state.NewState(tt.input, state.Position{Offset: 0, Line: 1, Column: 1}))
+		if tt.hasErr {
+			if !err.HasError() {
+				t.Errorf("expected error, got result: %v", res.Value)
+			}
+		} else {
+			if err.HasError() {
+				t.Errorf("unexpected error: %s", err.String())
+			}
+			if res.Value != tt.expected {
+				t.Errorf("expected %d, got %d", tt.expected, res.Value)
+			}
+		}
+	}
+}
+
+func TestChainr1(t *testing.T) {
+	op := parser.Map("+", parser.RuneParser("+", '+'), func(r rune) func(a, b int) int { return func(a, b int) int { return a + b } })
+	val := parser.Map("Rune digit to int", parser.Digit(), func(r rune) int { return int(r - '0') })
+	chain := parser.Chainr1("Left-associative addition", val, op)
+
+	tests := []struct {
+		name     string
+		input    string
+		expected int
+		hasErr   bool
+	}{
+		{
+			"Chainr1 test 1",
+			"1+2",
+			3,
+			false,
+		},
+		{
+			"Chainr1 test 2",
+			"1+2+9",
+			12,
+			false,
+		},
+		{
+			"Chainr1 test 3",
+			"1+",
+			0,
+			true,
+		},
+		{
+			"Chainr1 test 4",
+			"+2",
+			0,
+			true,
+		},
+		{
+			"Chainr1 test 5",
+			"",
+			0,
+			true,
+		},
+	}
+
+	for _, tt := range tests {
+		res, err := chain.Run(state.NewState(tt.input, state.Position{Offset: 0, Line: 1, Column: 1}))
+		if tt.hasErr {
+			if !err.HasError() {
+				t.Errorf("expected error, got result: %v", res.Value)
+			}
+		} else {
+			if err.HasError() {
+				t.Errorf("unexpected error: %s", err.String())
+			}
+			if res.Value != tt.expected {
+				t.Errorf("expected %d, got %d", tt.expected, res.Value)
 			}
 		}
 	}
