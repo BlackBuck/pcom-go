@@ -41,7 +41,7 @@ func (e *Error) FullTrace() string {
 			color.HiGreenString(fmt.Sprintf("Expected: %s", current.Expected)),
 			color.HiRedString(fmt.Sprintf("Got: %s", current.Got)),
 		)
-		current = e.Cause
+		current = current.Cause
 	}
 
 	return trace

@@ -23,6 +23,7 @@ func Alpha() Parser[rune] {
 }
 
 // AlphaNum parses alphanumeric values (single rune only)
+// AlphaNum parses alphanumeric values (single rune only)
 func AlphaNum() Parser[rune] {
 	alpha := Alpha()
 	num := Digit()
@@ -31,10 +32,12 @@ func AlphaNum() Parser[rune] {
 }
 
 // Parse a whitespace
+// Parse a whitespace
 func Whitespace() Parser[rune] {
 	return RuneParser("whitespace", ' ')
 }
 
+// CharWhere parses runes that satisfy a predicate
 // CharWhere parses runes that satisfy a predicate
 func CharWhere(predicate func(rune) bool, label string) Parser[rune] {
 	return Parser[rune]{
@@ -132,6 +135,7 @@ func OneOf(chars string) Parser[rune] {
 }
 
 // Debug prints the trace every time it runs.
+// Debug prints the trace every time it runs.
 func Debug[T any](p Parser[T], name string) Parser[T] {
 	return Parser[T]{
 		Run: func(curState state.State) (result Result[T], error Error) {
@@ -144,6 +148,7 @@ func Debug[T any](p Parser[T], name string) Parser[T] {
 	}
 }
 
+// Try doesn't consume the state if the parser fails.
 // Try doesn't consume the state if the parser fails.
 func Try[T any](p Parser[T]) Parser[T] {
 	return Parser[T]{

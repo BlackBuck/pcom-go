@@ -63,7 +63,7 @@ type Parser[T any] struct {
 
 ---
 
-## API Overview
+## 🛠️ API Overview
 
 ### Primitives
 

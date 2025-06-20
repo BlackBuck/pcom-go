@@ -117,7 +117,7 @@ func TestGetSnippetStringFromCurrentContext(t *testing.T) {
 			offset:     8, // in "line2"
 			line:       2,
 			column:     3,
-			lineStarts: []int{0, 6},
+			lineStarts: []int{0, 6, 12},
 			expected:   "line2",
 		},
 		{
