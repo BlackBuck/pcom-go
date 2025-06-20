@@ -145,15 +145,15 @@ func GetSnippetStringFromCurrentContext(s State) string {
 	}
 
 	lineStartOffset := s.LineStarts[currentLineIndex]
-	
+
 	var lineEndOffset int
-	
+
 	// Use LineStarts to find the end of the current line
 	if currentLineIndex+1 < len(s.LineStarts) {
 		// Not the last line - end is just before the next line start
 		nextLineStart := s.LineStarts[currentLineIndex+1]
 		lineEndOffset = nextLineStart
-		
+
 		// Trim the newline character(s) that caused the next line to start
 		// Check for CRLF (\r\n) first, then just \n or \r
 		if lineEndOffset > 0 && s.Input[lineEndOffset-1] == '\n' {
