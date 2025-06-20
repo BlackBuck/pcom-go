@@ -596,7 +596,7 @@ func TestManyTill(t *testing.T) {
 }
 
 func TestNot(t *testing.T) {
-	tests := []struct{
+	tests := []struct {
 		name     string
 		input    string
 		parser   parser.Parser[struct{}]
@@ -618,7 +618,7 @@ func TestNot(t *testing.T) {
 			parser.Not("not alphabet", parser.Alpha()),
 			struct{}{},
 			state.Position{Offset: 0, Line: 1, Column: 1},
-			false,	
+			false,
 		},
 		{
 			"Not test 3",
@@ -626,7 +626,7 @@ func TestNot(t *testing.T) {
 			parser.Not("not alphabet", parser.AlphaNum()),
 			struct{}{},
 			state.Position{Offset: 0, Line: 1, Column: 1},
-			false,	
+			false,
 		},
 		{
 			"Not test 4",
@@ -634,7 +634,7 @@ func TestNot(t *testing.T) {
 			parser.Not("not alphabet", parser.Alpha()),
 			struct{}{},
 			state.Position{Offset: 0, Line: 1, Column: 1},
-			false,	
+			false,
 		},
 		{
 			"Not test 5",
@@ -642,9 +642,9 @@ func TestNot(t *testing.T) {
 			parser.Not("not alphabet", parser.AlphaNum()),
 			struct{}{},
 			state.Position{Offset: 0, Line: 1, Column: 1},
-			true,	
+			true,
 		},
-	}	
+	}
 
 	for _, test := range tests {
 		res, err := test.parser.Run(state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1}))

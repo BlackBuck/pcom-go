@@ -319,23 +319,23 @@ func Not[T any](label string, p Parser[T]) Parser[struct{}] {
 			initialPos := state.NewPositionFromState(curState)
 			if err.HasError() {
 				return Result[struct{}]{
-					Value: struct{}{},
+					Value:     struct{}{},
 					NextState: curState,
 					Span: state.Span{
 						Start: initialPos,
-						End: initialPos,
+						End:   initialPos,
 					},
 				}, Error{}
 			}
 
 			return Result[struct{}]{}, Error{
-				Message: "Unexpected match in not.",
+				Message:  "Unexpected match in not.",
 				Expected: "Not " + p.Label,
-				Got: p.Label,
+				Got:      p.Label,
 				Position: state.NewPositionFromState(curState),
-				Snippet: state.GetSnippetStringFromCurrentContext(curState),
-				Cause: nil,
+				Snippet:  state.GetSnippetStringFromCurrentContext(curState),
+				Cause:    nil,
 			}
 		},
 	}
-}	
+}
