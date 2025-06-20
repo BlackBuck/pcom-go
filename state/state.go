@@ -21,7 +21,7 @@ func NewState(input string, position Position) State {
 	// precalculate LineStarts
 	lineStarts := []int{0}
 	for i := 0; i < len(input); {
-		if input[i] == '\r' && (i+1 < len(input) && input[i] == '\n') {
+		if input[i] == '\r' && (i+1 < len(input) && input[i+1] == '\n') {
 			i += 2
 			lineStarts = append(lineStarts, i)
 		} else if input[i] == '\n' {
@@ -133,25 +133,48 @@ func GetSnippetStringFromCurrentContext(s State) string {
 		return s.Input
 	}
 
+	// Validate that offset is within bounds
+	if s.Offset < 0 || s.Offset > len(s.Input) {
+		return s.Input // fallback to entire input for invalid offset
+	}
+
+	// Find the index of the line start that comes before or at the current offset
 	currentLineIndex := s.LineStartBeforeCurrentOffset()
 	if currentLineIndex < 0 { // offset is before the start
 		currentLineIndex = 0
 	}
 
 	lineStartOffset := s.LineStarts[currentLineIndex]
-
+	
 	var lineEndOffset int
-	// Search for the next newline after the current offset
-	for i := lineStartOffset; i < len(s.Input); i++ {
-		if s.Input[i] == '\n' || s.Input[i] == '\r' {
-			lineEndOffset = i
-			break
+	
+	// Use LineStarts to find the end of the current line
+	if currentLineIndex+1 < len(s.LineStarts) {
+		// Not the last line - end is just before the next line start
+		nextLineStart := s.LineStarts[currentLineIndex+1]
+		lineEndOffset = nextLineStart
+		
+		// Trim the newline character(s) that caused the next line to start
+		// Check for CRLF (\r\n) first, then just \n or \r
+		if lineEndOffset > 0 && s.Input[lineEndOffset-1] == '\n' {
+			lineEndOffset--
+			if lineEndOffset > 0 && s.Input[lineEndOffset-1] == '\r' {
+				lineEndOffset--
+			}
+		} else if lineEndOffset > 0 && s.Input[lineEndOffset-1] == '\r' {
+			lineEndOffset--
 		}
+	} else {
+		// Last line - end is the end of input
+		lineEndOffset = len(s.Input)
 	}
 
-	// If no newline found, set to end of input
-	if lineEndOffset == 0 {
+	// Ensure we don't go past the input bounds or before line start
+	if lineEndOffset > len(s.Input) {
 		lineEndOffset = len(s.Input)
+	}
+	if lineStartOffset > lineEndOffset {
+		lineStartOffset = lineEndOffset
 	}
 
 	lineContent := s.Input[lineStartOffset:lineEndOffset]

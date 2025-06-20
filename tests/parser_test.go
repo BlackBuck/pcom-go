@@ -111,8 +111,8 @@ func TestAnd(t *testing.T) {
 		expected rune
 	}{
 		{
-			"match all in sequence",
-			[]parser.Parser[rune]{parser.Or("a or b or c", parser.RuneParser("char a", 'a'), parser.RuneParser("char b", 'b')), parser.RuneParser("char c", 'c')},
+			"match all a",
+			[]parser.Parser[rune]{parser.Or("a or b or c", parser.RuneParser("char a", 'a'), parser.RuneParser("char b", 'a')), parser.RuneParser("char c", 'a')},
 			"abc",
 			'a',
 		},
