@@ -14,7 +14,7 @@ func BenchmarkRuneParser(b *testing.B) {
 	s := state.NewState("ciao", state.Position{Offset: 0, Line: 1, Column: 1})
 
 	for i := 0; i < b.N; i++ {
-		_, _ = p.Run(s)
+		_, _ = p.Run(&s)
 	}
 }
 func BenchmarkStringParser(b *testing.B) {
@@ -22,7 +22,7 @@ func BenchmarkStringParser(b *testing.B) {
 	s := state.NewState("hello world", state.Position{Offset: 0, Line: 1, Column: 1})
 
 	for i := 0; i < b.N; i++ {
-		_, _ = p.Run(s)
+		_, _ = p.Run(&s)
 	}
 }
 
@@ -50,7 +50,7 @@ func BenchmarkOrParser(b *testing.B) {
 	for _, test := range tests {
 		b.Run(test.name, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				_, _ = test.parser.Run(s)
+				_, _ = test.parser.Run(&s)
 			}
 		})
 	}
@@ -80,7 +80,7 @@ func BenchmarkAndParser(b *testing.B) {
 	for _, test := range tests {
 		b.Run(test.name, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				_, _ = test.parser.Run(s)
+				_, _ = test.parser.Run(&s)
 			}
 		})
 	}
@@ -95,7 +95,7 @@ func BenchmarkMany0(b *testing.B) {
 
 		b.Run(fmt.Sprintf("Many0 with length %d", j+1), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				_, _ = p.Run(s)
+				_, _ = p.Run(&s)
 			}
 		})
 	}
@@ -110,7 +110,7 @@ func BenchmarkMany1(b *testing.B) {
 
 		b.Run(fmt.Sprintf("Many1 with length %d", j+1), func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				_, _ = p.Run(s)
+				_, _ = p.Run(&s)
 			}
 		})
 	}

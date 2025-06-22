@@ -6,7 +6,7 @@ type Position struct {
 	Column int // column numbers - 1-indexed
 }
 
-func NewPositionFromState(s State) Position {
+func NewPositionFromState(s *State) Position {
 	return Position{
 		Offset: s.Offset,
 		Line:   s.Line,

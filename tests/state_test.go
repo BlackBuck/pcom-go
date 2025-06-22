@@ -136,7 +136,7 @@ func TestGetSnippetStringFromCurrentContext(t *testing.T) {
 			s := state.NewState(tt.input, state.Position{Offset: tt.offset, Line: tt.line, Column: tt.column})
 			s.LineStarts = tt.lineStarts
 
-			snippet := state.GetSnippetStringFromCurrentContext(s)
+			snippet := state.GetSnippetStringFromCurrentContext(&s)
 
 			assert.Equal(t, tt.expected, snippet)
 		})

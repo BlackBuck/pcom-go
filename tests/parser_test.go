@@ -8,7 +8,7 @@ import (
 
 func testRuneParserPass(t *testing.T, input string, expected rune, parser parser.Parser[rune]) {
 	state := state.NewState(input, state.Position{Offset: 0, Line: 1, Column: 1})
-	result, err := parser.Run(state)
+	result, err := parser.Run(&state)
 
 	if err.HasError() {
 		t.Error(err.String())
@@ -56,7 +56,8 @@ func TestStringParser(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		res, err := c.parser.Run(state.NewState(c.input, state.Position{Offset: 0, Line: 1, Column: 1}))
+		s := state.NewState(c.input, state.Position{Offset: 0, Line: 1, Column: 1})
+		res, err := c.parser.Run(&s)
 
 		if err.HasError() {
 			t.Error(err.String())
@@ -92,7 +93,7 @@ func TestOr(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			state := state.NewState(tt.input, state.Position{Offset: 0, Line: 1, Column: 1})
-			result, err := tt.parser.Run(state)
+			result, err := tt.parser.Run(&state)
 			if err.HasError() {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -121,7 +122,7 @@ func TestAnd(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			state := state.NewState(tt.input, state.Position{Offset: 0, Line: 1, Column: 1})
-			result, err := parser.And("And test", tt.parsers...).Run(state)
+			result, err := parser.And("And test", tt.parsers...).Run(&state)
 			if err.HasError() {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -156,7 +157,7 @@ func TestMany0(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			state := state.NewState(tt.input, state.Position{Offset: 0, Line: 1, Column: 1})
-			result, err := tt.parser.Run(state)
+			result, err := tt.parser.Run(&state)
 			if err.HasError() {
 				t.Errorf("unexpected error: %v", err)
 			}
@@ -199,7 +200,7 @@ func TestMany1(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			state := state.NewState(tt.input, state.Position{Offset: 0, Line: 1, Column: 1})
-			result, err := tt.parser.Run(state)
+			result, err := tt.parser.Run(&state)
 			if tt.wantErr {
 				if !err.HasError() {
 					t.Errorf("expected error, got nil")
@@ -248,7 +249,7 @@ func TestBetween(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			state := state.NewState(tt.input, state.Position{Offset: 0, Line: 1, Column: 1})
-			result, err := tt.parser.Run(state)
+			result, err := tt.parser.Run(&state)
 			if tt.wantErr {
 				if !err.HasError() {
 					t.Errorf("expected error, got nil")
@@ -302,7 +303,8 @@ func TestThenParser(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		res, err := expr.Run(state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1}))
+		s := state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1})
+		res, err := expr.Run(&s)
 		if test.wantErr {
 			if !err.HasError() {
 				t.Errorf("%s failed\nexpected error, got nil\n", test.name)
@@ -356,7 +358,8 @@ func TestKeepLeft(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		res, err := expr.Run(state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1}))
+		s := state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1})
+		res, err := expr.Run(&s)
 		if test.wantErr {
 			if !err.HasError() {
 				t.Errorf("%s failed\nexpected error, got nil\n", test.name)
@@ -410,7 +413,8 @@ func TestKeepRight(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		res, err := expr.Run(state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1}))
+		s := state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1})
+		res, err := expr.Run(&s)
 		if test.wantErr {
 			if !err.HasError() {
 				t.Errorf("%s failed\nexpected error, got nil\n", test.name)
@@ -451,7 +455,8 @@ func TestLazyRecursive(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		res, err := parens.Run(state.NewState(tt.input, state.Position{Offset: 0, Line: 1, Column: 1}))
+		s := state.NewState(tt.input, state.Position{Offset: 0, Line: 1, Column: 1})
+		res, err := parens.Run(&s)
 		if tt.wantErr {
 			if !err.HasError() {
 				t.Errorf("expected error, got result: %v", res.Value)
@@ -511,7 +516,8 @@ func TestChainl1(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		res, err := chain.Run(state.NewState(tt.input, state.Position{Offset: 0, Line: 1, Column: 1}))
+		s := state.NewState(tt.input, state.Position{Offset: 0, Line: 1, Column: 1})
+		res, err := chain.Run(&s)
 		if tt.hasErr {
 			if !err.HasError() {
 				t.Errorf("expected error, got result: %v", res.Value)
@@ -571,7 +577,8 @@ func TestChainr1(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		res, err := chain.Run(state.NewState(tt.input, state.Position{Offset: 0, Line: 1, Column: 1}))
+		s := state.NewState(tt.input, state.Position{Offset: 0, Line: 1, Column: 1})
+		res, err := chain.Run(&s)
 		if tt.hasErr {
 			if !err.HasError() {
 				t.Errorf("expected error, got result: %v", res.Value)
