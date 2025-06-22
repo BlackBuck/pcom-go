@@ -30,7 +30,8 @@ func TestWhitespace(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		res, err := parser.Whitespace().Run(state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1}))
+		s := state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1})
+		res, err := parser.Whitespace().Run(&s)
 		if test.wantErr {
 			if !err.HasError() {
 				t.Errorf("%s failed\nExpected: error\nGot: %v\n", test.name, res.Value)
@@ -79,7 +80,8 @@ func TestDigit(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		res, err := test.parser.Run(state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1}))
+		s := state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1})
+		res, err := test.parser.Run(&s)
 		if test.hasErr {
 			if !err.HasError() {
 				t.Errorf("%s failed\nExpected: error\nGot: %v\n", test.name, res.Value)
@@ -135,7 +137,8 @@ func TestAlpha(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		res, err := test.parser.Run(state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1}))
+		s := state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1})
+		res, err := test.parser.Run(&s)
 		if test.hasErr {
 			if !err.HasError() {
 				t.Errorf("%s failed\nExpected: error\nGot: %v\n", test.name, res.Value)
@@ -191,7 +194,8 @@ func TestAlphaNum(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		res, err := test.parser.Run(state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1}))
+		s := state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1})
+		res, err := test.parser.Run(&s)
 		if test.hasErr {
 			if !err.HasError() {
 				t.Errorf("%s failed\nExpected: error\nGot: %v\n", test.name, res.Value)
@@ -247,7 +251,8 @@ func TestCharWhere(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		res, err := test.parser.Run(state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1}))
+		s := state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1})
+		res, err := test.parser.Run(&s)
 		if test.hasErr {
 			if !err.HasError() {
 				t.Errorf("%s failed\nExpected: error\nGot: %v\n", test.name, res.Value)
@@ -317,7 +322,8 @@ func TestStringCI(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		res, err := test.parser.Run(state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1}))
+		s := state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1})
+		res, err := test.parser.Run(&s)
 		if test.hasErr {
 			if !err.HasError() {
 				t.Errorf("%s failed\nExpected: error\nGot: %v\n", test.name, res.Value)
@@ -370,7 +376,8 @@ func TestLexeme(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		res, err := test.parser.Run(state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1}))
+		s := state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1})
+		res, err := test.parser.Run(&s)
 
 		if test.hasErr {
 			if !err.HasError() {
@@ -459,7 +466,8 @@ func TestSeparatedBy(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		res, err := test.parser.Run(state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1}))
+		s := state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1})
+		res, err := test.parser.Run(&s)
 
 		if test.hasErr {
 			if !err.HasError() {
@@ -519,7 +527,8 @@ func TestTakeWhile(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		res, err := test.parser.Run(state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1}))
+		s := state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1})
+		res, err := test.parser.Run(&s)
 
 		if test.hasErr {
 			if !err.HasError() {
@@ -579,7 +588,8 @@ func TestManyTill(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		res, err := test.parser.Run(state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1}))
+		s := state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1})
+		res, err := test.parser.Run(&s)
 
 		if test.hasErr {
 			if !err.HasError() {
@@ -647,7 +657,8 @@ func TestNot(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		res, err := test.parser.Run(state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1}))
+		s := state.NewState(test.input, state.Position{Offset: 0, Line: 1, Column: 1})
+		res, err := test.parser.Run(&s)
 
 		if test.hasErr {
 			if !err.HasError() {

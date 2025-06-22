@@ -87,7 +87,7 @@ func main() {
 	s := state.NewState(input, state.Position{Offset: 0, Line: 1, Column: 1})
 	exprParser := parseExpr()
 
-	res, err := exprParser.Run(s)
+	res, err := exprParser.Run(&s)
 	if err.HasError() {
 		fmt.Println(err.FullTrace())
 		return

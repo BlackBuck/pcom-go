@@ -17,6 +17,15 @@ type State struct {
 	LineStarts []int // offsets where newline chracters are present
 }
 
+func isNewLineChar(c rune) bool {
+	return c == '\r' || c == '\n'
+}
+
+// remove after setting up rollbacks
+func NewCopyFromState(s *State) State {
+	return NewState(s.Input, NewPositionFromState(s))
+}
+
 func NewState(input string, position Position) State {
 	// precalculate LineStarts
 	lineStarts := []int{0}
@@ -41,16 +50,13 @@ func NewState(input string, position Position) State {
 func (s *State) InBounds(offset int) bool {
 	return offset < len(s.Input)
 }
+
 func (s *State) HasAvailableChars(n int) bool {
 	return s.Offset < len(s.Input)-n+1
 }
 
-func isNewLineChar(c rune) bool {
-	return c == '\r' || c == '\n'
-}
-
 func (s *State) Consume(n int) (string, Span, bool) {
-	startPos := NewPositionFromState(*s)
+	startPos := NewPositionFromState(s)
 
 	start := startPos.Offset
 	end := start
@@ -74,7 +80,7 @@ func (s *State) Consume(n int) (string, Span, bool) {
 		return "", Span{}, false
 	}
 
-	return s.Input[start:end], Span{startPos, NewPositionFromState(*s)}, true
+	return s.Input[start:end], Span{startPos, NewPositionFromState(s)}, true
 }
 
 func (s *State) UpdatePosition(pos Position) {
@@ -127,7 +133,8 @@ func (s *State) LineStartBeforeCurrentOffset() int {
 	return hi
 }
 
-func GetSnippetStringFromCurrentContext(s State) string {
+// TODO: change it to: func (s *State) GetSnippetString...() string {}
+func GetSnippetStringFromCurrentContext(s *State) string {
 	// If LineStarts is empty, fall back to entire input
 	if len(s.LineStarts) == 0 {
 		return s.Input
@@ -186,4 +193,16 @@ func isCRLF(s *State) bool {
 		return true
 	}
 	return false
+}
+
+// Return current position as a checkpoint
+func (s *State) Save() Position {
+	return NewPositionFromState(s)
+}
+
+// Rollback to a checkpoint cp
+func (s *State) Rollback(cp Position) {
+	s.Offset = cp.Offset
+	s.Line = cp.Line
+	s.Column = cp.Column
 }

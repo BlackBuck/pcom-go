@@ -18,16 +18,16 @@ type Pair[A, B any] struct {
 // `Span` determines the start and end position of the result in the Input.
 type Result[T any] struct {
 	Value     T
-	NextState state.State
+	NextState *state.State
 	Span      state.Span
 }
 
 type Parser[T any] struct {
-	Run   func(state state.State) (result Result[T], error Error)
+	Run   func(curState *state.State) (result Result[T], error Error)
 	Label string
 }
 
-func NewResult[T any](value T, nextState state.State, span state.Span) Result[T] {
+func NewResult[T any](value T, nextState *state.State, span state.Span) Result[T] {
 	return Result[T]{value, nextState, span}
 }
 
@@ -36,7 +36,7 @@ func NewResult[T any](value T, nextState state.State, span state.Span) Result[T]
 // If it matches the input rune successfully, it returns it with the `Result` else returns an Error.
 func RuneParser(label string, c rune) Parser[rune] {
 	return Parser[rune]{
-		Run: func(curState state.State) (Result[rune], Error) {
+		Run: func(curState *state.State) (Result[rune], Error) {
 			if !curState.InBounds(curState.Offset) {
 				return Result[rune]{}, Error{
 					Message:  "Reached the end of file while parsing",
@@ -75,9 +75,8 @@ func RuneParser(label string, c rune) Parser[rune] {
 // StringParser parses a string(case-sensitive).
 func StringParser(label string, s string) Parser[string] {
 	return Parser[string]{
-		Run: func(curState state.State) (Result[string], Error) {
+		Run: func(curState *state.State) (Result[string], Error) {
 			if !curState.InBounds(curState.Offset + len(s) - 1) {
-
 				return Result[string]{}, Error{
 					Message:  "Reached the end of file while parsing",
 					Expected: s,
@@ -92,8 +91,6 @@ func StringParser(label string, s string) Parser[string] {
 				// TODO: Run which is better, passing the state (all state functions without pointer)
 				// or updating the state in-place (all state functions with a pointer)
 
-				t := curState
-				t.Consume(len(s))
 				return Result[string]{}, Error{
 					Message:  "Strings do not match.",
 					Expected: s,
@@ -104,7 +101,7 @@ func StringParser(label string, s string) Parser[string] {
 				}
 			}
 
-			prev := state.NewPositionFromState(curState)
+			prev := curState.Save()
 			curState.Consume(len(s))
 			return NewResult(
 				s,
@@ -124,13 +121,15 @@ func StringParser(label string, s string) Parser[string] {
 // If no parser succeeds, it returns the furthest error.
 func Or[T any](label string, parsers ...Parser[T]) Parser[T] {
 	return Parser[T]{
-		Run: func(curState state.State) (Result[T], Error) {
+		Run: func(curState *state.State) (Result[T], Error) {
 			var lastErr Error
 			for _, parser := range parsers {
+				cp := curState.Save()
 				res, err := parser.Run(curState) // sends a copy
 				if !err.HasError() {
 					return res, Error{}
 				}
+				curState.Rollback(cp) // rollback to previous safe state on error
 				lastErr = err
 			}
 
@@ -153,12 +152,13 @@ func Or[T any](label string, parsers ...Parser[T]) Parser[T] {
 // If any parser fails, it returns an error of that parser failing.
 func And[T any](label string, parsers ...Parser[T]) Parser[T] {
 	return Parser[T]{
-		Run: func(curState state.State) (Result[T], Error) {
+		Run: func(curState *state.State) (Result[T], Error) {
 			var lastRes Result[T]
 			for _, parser := range parsers {
-				res, err := parser.Run(curState) // sends a copy
+				cp := curState.Save()
+				res, err := parser.Run(curState)
 				if err.HasError() {
-
+					curState.Rollback(cp) // rollback on error
 					return Result[T]{}, Error{
 						Message:  "And combinator failed.",
 						Expected: err.Expected,
@@ -168,6 +168,7 @@ func And[T any](label string, parsers ...Parser[T]) Parser[T] {
 						Cause:    &err,
 					}
 				}
+				curState.Rollback(cp) // run on the same input
 				lastRes = res
 			}
 
@@ -182,9 +183,9 @@ func And[T any](label string, parsers ...Parser[T]) Parser[T] {
 // It does not return an error.
 func Many0[T any](label string, p Parser[T]) Parser[[]T] {
 	return Parser[[]T]{
-		Run: func(curState state.State) (Result[[]T], Error) {
+		Run: func(curState *state.State) (Result[[]T], Error) {
 			var results []T
-			originalState := curState
+			initialPos := state.NewPositionFromState(curState)
 			for {
 				res, err := p.Run(curState)
 				if err.HasError() {
@@ -197,7 +198,7 @@ func Many0[T any](label string, p Parser[T]) Parser[[]T] {
 				Value:     results,
 				NextState: curState,
 				Span: state.Span{
-					Start: state.NewPositionFromState(originalState),
+					Start: initialPos,
 					End:   state.NewPositionFromState(curState),
 				},
 			}, Error{}
@@ -210,11 +211,13 @@ func Many0[T any](label string, p Parser[T]) Parser[[]T] {
 // It is similar to Many0, but returns an error if it cannot parse even once.
 func Many1[T any](label string, p Parser[T]) Parser[[]T] {
 	return Parser[[]T]{
-		Run: func(curState state.State) (Result[[]T], Error) {
+		Run: func(curState *state.State) (Result[[]T], Error) {
 			var results []T
-			originalState := curState
+			var cp state.Position
+			initialPos := state.NewPositionFromState(curState)
 			var lastErr Error
 			for {
+				cp = curState.Save()
 				res, err := p.Run(curState)
 				if err.HasError() {
 					lastErr = err
@@ -228,18 +231,19 @@ func Many1[T any](label string, p Parser[T]) Parser[[]T] {
 					Value:     results,
 					NextState: curState,
 					Span: state.Span{
-						Start: state.NewPositionFromState(originalState),
+						Start: initialPos,
 						End:   state.NewPositionFromState(curState),
 					},
 				}, Error{}
 			}
 
+			curState.Rollback(cp) // rollback on error
 			return Result[[]T]{}, Error{
 				Message:  "Many1 parser failed.",
 				Expected: fmt.Sprintf("<%s> at least once", p.Label),
 				Got:      fmt.Sprintf("<%s> zero times", p.Label),
 				Snippet:  state.GetSnippetStringFromCurrentContext(curState),
-				Position: state.NewPositionFromState(curState),
+				Position: curState.Save(),
 				Cause:    &lastErr,
 			}
 		},
@@ -251,9 +255,11 @@ func Many1[T any](label string, p Parser[T]) Parser[[]T] {
 // It does not return any error.
 func Optional[T any](label string, p Parser[T]) Parser[T] {
 	return Parser[T]{
-		Run: func(curState state.State) (Result[T], Error) {
+		Run: func(curState *state.State) (Result[T], Error) {
+			cp := curState.Save()
 			res, err := p.Run(curState)
 			if err.HasError() {
+				curState.Rollback(cp)
 				return Result[T]{
 					NextState: curState, // TODO: should I return this????
 				}, Error{}
@@ -270,12 +276,13 @@ func Optional[T any](label string, p Parser[T]) Parser[T] {
 // If any parser fails, it returns an error.
 func Sequence[T any](label string, parsers []Parser[T]) Parser[T] {
 	return Parser[T]{
-		Run: func(curState state.State) (Result[T], Error) {
+		Run: func(curState *state.State) (Result[T], Error) {
 			var ret Result[T]
 			for _, parser := range parsers {
+				cp := curState.Save()
 				res, err := parser.Run(curState)
 				if err.HasError() {
-
+					curState.Rollback(cp)
 					return Result[T]{}, Error{
 						Message:  "Sequence parser failed.",
 						Expected: err.Expected,
@@ -286,6 +293,7 @@ func Sequence[T any](label string, parsers []Parser[T]) Parser[T] {
 					}
 				}
 				ret = res
+				curState = res.NextState
 			}
 			return ret, Error{}
 		},
@@ -296,9 +304,11 @@ func Sequence[T any](label string, parsers []Parser[T]) Parser[T] {
 // Map parses the output of one parser(p1) to a function.
 func Map[A, B any](label string, p1 Parser[A], f func(A) B) Parser[B] {
 	return Parser[B]{
-		Run: func(curState state.State) (result Result[B], error Error) {
+		Run: func(curState *state.State) (result Result[B], error Error) {
+			cp := curState.Save()
 			res, err := p1.Run(curState)
 			if err.HasError() {
+				curState.Rollback(cp)
 				return Result[B]{}, Error{
 					Message:  "Map parser failed",
 					Expected: err.Expected,
@@ -313,7 +323,7 @@ func Map[A, B any](label string, p1 Parser[A], f func(A) B) Parser[B] {
 				Value:     f(res.Value),
 				NextState: res.NextState,
 				Span: state.Span{
-					Start: state.NewPositionFromState(curState),
+					Start: cp,
 					End:   state.NewPositionFromState(res.NextState),
 				},
 			}, Error{}
@@ -327,9 +337,11 @@ func Map[A, B any](label string, p1 Parser[A], f func(A) B) Parser[B] {
 // If any parser fails, it returns an adequate error.
 func Then[A, B any](label string, p1 Parser[A], p2 Parser[B]) Parser[Pair[A, B]] {
 	return Parser[Pair[A, B]]{
-		Run: func(curState state.State) (result Result[Pair[A, B]], error Error) {
+		Run: func(curState *state.State) (result Result[Pair[A, B]], error Error) {
+			cp := curState.Save()
 			leftRes, err := p1.Run(curState)
 			if err.HasError() {
+				curState.Rollback(cp)
 				return Result[Pair[A, B]]{}, Error{
 					Message:  "Left of Then failed",
 					Expected: err.Expected,
@@ -342,6 +354,7 @@ func Then[A, B any](label string, p1 Parser[A], p2 Parser[B]) Parser[Pair[A, B]]
 
 			rightRes, err := p2.Run(leftRes.NextState)
 			if err.HasError() {
+				curState.Rollback(cp)
 				return Result[Pair[A, B]]{}, Error{
 					Message:  "Right of Then failed",
 					Expected: err.Expected,
@@ -356,7 +369,7 @@ func Then[A, B any](label string, p1 Parser[A], p2 Parser[B]) Parser[Pair[A, B]]
 				Value:     Pair[A, B]{leftRes.Value, rightRes.Value},
 				NextState: rightRes.NextState,
 				Span: state.Span{
-					Start: state.NewPositionFromState(curState),
+					Start: cp,
 					End:   state.NewPositionFromState(rightRes.NextState),
 				},
 			}, Error{}
@@ -368,14 +381,17 @@ func Then[A, B any](label string, p1 Parser[A], p2 Parser[B]) Parser[Pair[A, B]]
 // KeepLeft is used to keep the result of the Left parser and discard the Right part.
 func KeepLeft[A, B any](label string, p Parser[Pair[A, B]]) Parser[A] {
 	return Parser[A]{
-		Run: func(curState state.State) (result Result[A], error Error) {
+		Run: func(curState *state.State) (result Result[A], error Error) {
+			cp := curState.Save()
 			res, err := p.Run(curState)
 			if err.HasError() {
+				curState.Rollback(cp)
 				return Result[A]{}, Error{
 					Message:  "KeepLeft failed.",
 					Expected: err.Expected,
 					Got:      err.Got,
 					Position: err.Position,
+					Snippet:  err.Snippet,
 					Cause:    &err,
 				}
 			}
@@ -393,14 +409,17 @@ func KeepLeft[A, B any](label string, p Parser[Pair[A, B]]) Parser[A] {
 // KeepRight is used to keep teh result of the Right parser and discard the Left part.
 func KeepRight[A, B any](label string, p Parser[Pair[A, B]]) Parser[B] {
 	return Parser[B]{
-		Run: func(curState state.State) (result Result[B], error Error) {
+		Run: func(curState *state.State) (result Result[B], error Error) {
+			cp := curState.Save()
 			res, err := p.Run(curState)
 			if err.HasError() {
+				curState.Rollback(cp)
 				return Result[B]{}, Error{
 					Message:  "KeepRight failed.",
 					Expected: err.Expected,
 					Got:      err.Got,
 					Position: err.Position,
+					Snippet:  err.Snippet,
 					Cause:    &err,
 				}
 			}
@@ -420,17 +439,20 @@ func KeepRight[A, B any](label string, p Parser[Pair[A, B]]) Parser[B] {
 // It returns an error if any of open, content, or close fails.
 func Between[L, C, R any](label string, open Parser[L], content Parser[C], close Parser[R]) Parser[C] {
 	return Parser[C]{
-		Run: func(curState state.State) (result Result[C], error Error) {
+		Run: func(curState *state.State) (result Result[C], error Error) {
 			left := KeepLeft("", Then("", content, close))
 			right := KeepRight("", Then("", open, left))
 
+			cp := curState.Save()
 			res, err := right.Run(curState)
 			if err.HasError() {
+				curState.Rollback(cp)
 				return Result[C]{}, Error{
 					Message:  "Between combinator failed.",
 					Expected: err.Expected,
 					Got:      err.Got,
 					Position: err.Position,
+					Snippet:  err.Snippet,
 					Cause:    &err,
 				}
 			}
@@ -448,7 +470,7 @@ func Lazy[T any](label string, f func() Parser[T]) Parser[T] {
 	var once sync.Once // thread-safe Lazy init
 
 	return Parser[T]{
-		Run: func(curState state.State) (Result[T], Error) {
+		Run: func(curState *state.State) (Result[T], Error) {
 			once.Do(func() {
 				p = f()
 			})
@@ -461,15 +483,17 @@ func Lazy[T any](label string, f func() Parser[T]) Parser[T] {
 // Chainl1 parses one or more p values separated by op, and folds them left-associatively
 func Chainl1[T any](label string, p Parser[T], op Parser[func(T, T) T]) Parser[T] {
 	return Parser[T]{
-		Run: func(curState state.State) (result Result[T], error Error) {
-			initialPos := state.NewPositionFromState(curState)
+		Run: func(curState *state.State) (result Result[T], error Error) {
+			cp := curState.Save()
 			left, err := p.Run(curState)
 			if err.HasError() {
+				curState.Rollback(cp)
 				return Result[T]{}, Error{
 					Message:  "Chainl1: failed to parse initial value.",
 					Expected: err.Expected,
 					Got:      err.Got,
 					Position: err.Position,
+					Snippet:  err.Snippet,
 					Cause:    &err,
 				}
 			}
@@ -484,11 +508,13 @@ func Chainl1[T any](label string, p Parser[T], op Parser[func(T, T) T]) Parser[T
 
 				right, err := p.Run(f.NextState)
 				if err.HasError() {
+					curState.Rollback(cp)
 					return Result[T]{}, Error{
 						Message:  "Chainl1: failed to parse right value.",
 						Expected: err.Expected,
 						Got:      err.Got,
 						Position: err.Position,
+						Snippet:  err.Snippet,
 						Cause:    &err,
 					}
 				}
@@ -500,7 +526,7 @@ func Chainl1[T any](label string, p Parser[T], op Parser[func(T, T) T]) Parser[T
 				Value:     ass,
 				NextState: curState,
 				Span: state.Span{
-					Start: initialPos,
+					Start: cp,
 					End:   state.NewPositionFromState(curState),
 				},
 			}, Error{}
@@ -511,10 +537,10 @@ func Chainl1[T any](label string, p Parser[T], op Parser[func(T, T) T]) Parser[T
 
 func Chainr1[T any](label string, p Parser[T], op Parser[func(T, T) T]) Parser[T] {
 	return Parser[T]{
-		Run: func(curState state.State) (result Result[T], error Error) {
+		Run: func(curState *state.State) (result Result[T], error Error) {
 			var vals []T
 			var fs []func(T, T) T
-			initialPos := state.NewPositionFromState(curState)
+			cp := curState.Save()
 			leftVal, err := p.Run(curState)
 			if err.HasError() {
 				return Result[T]{}, Error{
@@ -522,6 +548,7 @@ func Chainr1[T any](label string, p Parser[T], op Parser[func(T, T) T]) Parser[T
 					Expected: err.Expected,
 					Got:      err.Got,
 					Position: err.Position,
+					Snippet:  err.Snippet,
 					Cause:    &err,
 				}
 			}
@@ -537,6 +564,7 @@ func Chainr1[T any](label string, p Parser[T], op Parser[func(T, T) T]) Parser[T
 				fs = append(fs, f.Value)
 				rightVal, err := p.Run(f.NextState)
 				if err.HasError() {
+					curState.Rollback(cp)
 					return Result[T]{}, Error{
 						Message:  "Chainr1: failed to parse right value.",
 						Expected: err.Expected,
@@ -562,7 +590,7 @@ func Chainr1[T any](label string, p Parser[T], op Parser[func(T, T) T]) Parser[T
 				Value:     vals[0],
 				NextState: curState,
 				Span: state.Span{
-					Start: initialPos,
+					Start: cp,
 					End:   state.NewPositionFromState(curState),
 				},
 			}, Error{}

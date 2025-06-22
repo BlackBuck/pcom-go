@@ -2,9 +2,10 @@ package parser
 
 import (
 	"fmt"
-	state "github.com/BlackBuck/pcom-go/state"
 	"strings"
 	"unicode/utf8"
+
+	state "github.com/BlackBuck/pcom-go/state"
 )
 
 func AnyChar() Parser[rune] {
@@ -41,7 +42,7 @@ func Whitespace() Parser[rune] {
 // CharWhere parses runes that satisfy a predicate
 func CharWhere(predicate func(rune) bool, label string) Parser[rune] {
 	return Parser[rune]{
-		Run: func(curState state.State) (Result[rune], Error) {
+		Run: func(curState *state.State) (Result[rune], Error) {
 			if !curState.InBounds(curState.Offset) {
 				return Result[rune]{}, Error{
 					Message:  "Char parser with predicate failed.",
@@ -52,19 +53,21 @@ func CharWhere(predicate func(rune) bool, label string) Parser[rune] {
 				}
 			}
 
+			cp := curState.Save()
 			r, size := utf8.DecodeRuneInString(curState.Input[curState.Offset:])
 			if predicate(r) {
-				newState := curState
-				newState.Consume(size)
+				curState.Consume(size)
 				return Result[rune]{
 					Value:     r,
-					NextState: newState,
+					NextState: curState,
 					Span: state.Span{
-						Start: state.NewPositionFromState(curState),
-						End:   state.NewPositionFromState(newState),
+						Start: cp,
+						End:   curState.Save(),
 					},
 				}, Error{}
 			}
+
+			curState.Rollback(cp)
 			return Result[rune]{}, Error{
 				Message:  "Char parser with predicate failed.",
 				Expected: label,
@@ -82,7 +85,7 @@ func CharWhere(predicate func(rune) bool, label string) Parser[rune] {
 func StringCI(s string) Parser[string] {
 	lower := strings.ToLower(s)
 	return Parser[string]{
-		Run: func(curState state.State) (Result[string], Error) {
+		Run: func(curState *state.State) (Result[string], Error) {
 			if !curState.InBounds(curState.Offset + len(lower) - 1) {
 				return Result[string]{}, Error{
 					Message:  "Reached the end of file while parsing",
@@ -93,10 +96,9 @@ func StringCI(s string) Parser[string] {
 				}
 			}
 
+			cp := curState.Save()
 			got := curState.Input[curState.Offset : curState.Offset+len(lower)]
 			if strings.ToLower(got) != lower {
-				t := curState
-				t.Consume(len(lower))
 				return Result[string]{}, Error{
 					Message:  "Strings do not match (case-insensitive).",
 					Expected: fmt.Sprintf("String (case-insensitive) %s", s),
@@ -106,14 +108,13 @@ func StringCI(s string) Parser[string] {
 				}
 			}
 
-			prev := state.NewPositionFromState(curState)
 			curState.Consume(len(lower))
 			return NewResult(
 				got,
 				curState,
 				state.Span{
-					Start: prev,
-					End:   state.NewPositionFromState(curState),
+					Start: cp,
+					End:   curState.Save(),
 				}), Error{}
 
 		},
@@ -138,7 +139,7 @@ func OneOf(chars string) Parser[rune] {
 // Debug prints the trace every time it runs.
 func Debug[T any](p Parser[T], name string) Parser[T] {
 	return Parser[T]{
-		Run: func(curState state.State) (result Result[T], error Error) {
+		Run: func(curState *state.State) (result Result[T], error Error) {
 			fmt.Printf("Trying %s at position %v\n", name, state.NewPositionFromState(curState))
 			res, err := p.Run(curState)
 			fmt.Printf("Parser returned with\nResult: %v\nError: %v", res.Value, err)
@@ -152,13 +153,13 @@ func Debug[T any](p Parser[T], name string) Parser[T] {
 // Try doesn't consume the state if the parser fails.
 func Try[T any](p Parser[T]) Parser[T] {
 	return Parser[T]{
-		Run: func(curState state.State) (result Result[T], error Error) {
-			prevState := curState
-
+		Run: func(curState *state.State) (result Result[T], error Error) {
+			cp := curState.Save()
 			res, err := p.Run(curState)
 			if err.HasError() {
+				curState.Rollback(cp)
 				return Result[T]{
-					NextState: prevState,
+					NextState: curState,
 				}, Error{}
 			}
 
@@ -171,9 +172,11 @@ func Try[T any](p Parser[T]) Parser[T] {
 func Lexeme[T any](p Parser[T]) Parser[T] {
 	return Parser[T]{
 		Label: fmt.Sprintf("lexeme <%s>", p.Label),
-		Run: func(s state.State) (Result[T], Error) {
-			res, err := p.Run(s)
+		Run: func(curState *state.State) (Result[T], Error) {
+			cp := curState.Save()
+			res, err := p.Run(curState)
 			if err.HasError() {
+				curState.Rollback(cp)
 				return res, err
 			}
 			r, err := Whitespace().Run(res.NextState) // consume trailing space
@@ -188,6 +191,7 @@ func Lexeme[T any](p Parser[T]) Parser[T] {
 					},
 				}, Error{}
 			}
+			
 
 			return res, Error{}
 		},
@@ -196,9 +200,9 @@ func Lexeme[T any](p Parser[T]) Parser[T] {
 
 func TakeWhile(label string, f func(byte) bool) Parser[string] {
 	return Parser[string]{
-		Run: func(curState state.State) (result Result[string], error Error) {
+		Run: func(curState *state.State) (result Result[string], error Error) {
 			var ret string
-			initialPos := state.NewPositionFromState(curState)
+			cp := curState.Save()
 			for curState.InBounds(curState.Offset) && f(curState.Input[curState.Offset]) {
 				r, _, _ := curState.Consume(1)
 				ret += r
@@ -208,7 +212,7 @@ func TakeWhile(label string, f func(byte) bool) Parser[string] {
 				Value:     ret,
 				NextState: curState,
 				Span: state.Span{
-					Start: initialPos,
+					Start: cp,
 					End:   state.NewPositionFromState(curState),
 				},
 			}, Error{}
@@ -219,11 +223,12 @@ func TakeWhile(label string, f func(byte) bool) Parser[string] {
 
 func SeparatedBy[A, B any](label string, p Parser[A], delimiter Parser[B]) Parser[[]A] {
 	return Parser[[]A]{
-		Run: func(curState state.State) (result Result[[]A], error Error) {
+		Run: func(curState *state.State) (result Result[[]A], error Error) {
 			var ret []A
-			initialPos := state.NewPositionFromState(curState)
+			cp := state.NewPositionFromState(curState)
 			first, err := p.Run(curState)
 			if err.HasError() {
+				curState.Rollback(cp)
 				return Result[[]A]{}, Error{
 					Message:  "SeparatedBy failed.",
 					Expected: err.Expected,
@@ -244,6 +249,7 @@ func SeparatedBy[A, B any](label string, p Parser[A], delimiter Parser[B]) Parse
 
 				res, err := p.Run(del.NextState)
 				if err.HasError() {
+					curState.Rollback(cp)
 					return Result[[]A]{}, Error{
 						Message:  "SeparatedBy failed after delimiter.",
 						Expected: err.Expected,
@@ -261,7 +267,7 @@ func SeparatedBy[A, B any](label string, p Parser[A], delimiter Parser[B]) Parse
 				Value:     ret,
 				NextState: curState,
 				Span: state.Span{
-					Start: initialPos,
+					Start: cp,
 					End:   state.NewPositionFromState(curState),
 				},
 			}, Error{}
@@ -272,17 +278,19 @@ func SeparatedBy[A, B any](label string, p Parser[A], delimiter Parser[B]) Parse
 
 func ManyTill[A, B any](label string, p Parser[A], end Parser[B]) Parser[[]A] {
 	return Parser[[]A]{
-		Run: func(curState state.State) (result Result[[]A], error Error) {
+		Run: func(curState *state.State) (result Result[[]A], error Error) {
 			var ret []A
 			initialPos := state.NewPositionFromState(curState)
 			for curState.InBounds(curState.Offset) {
+				cp := curState.Save()
 				_, err := end.Run(curState)
 				if !err.HasError() {
+					curState.Rollback(cp)
 					return Result[[]A]{
 						Value:     ret,
 						NextState: curState,
 						Span: state.Span{
-							Start: initialPos,
+							Start: cp,
 							End:   state.NewPositionFromState(curState),
 						},
 					}, Error{}
@@ -290,11 +298,13 @@ func ManyTill[A, B any](label string, p Parser[A], end Parser[B]) Parser[[]A] {
 
 				res, err := p.Run(curState)
 				if err.HasError() {
+					curState.Rollback(cp)
 					return Result[[]A]{}, Error{
 						Message:  "ManyTill parser failed.",
 						Expected: err.Expected,
 						Got:      err.Got,
 						Position: err.Position,
+						Snippet: err.Snippet,
 						Cause:    &err,
 					}
 				}
@@ -319,16 +329,17 @@ func ManyTill[A, B any](label string, p Parser[A], end Parser[B]) Parser[[]A] {
 // Not does not consume any input. It is used to prevent any unwanted match.
 func Not[T any](label string, p Parser[T]) Parser[struct{}] {
 	return Parser[struct{}]{
-		Run: func(curState state.State) (result Result[struct{}], error Error) {
+		Run: func(curState *state.State) (result Result[struct{}], error Error) {
 			_, err := p.Run(curState)
-			initialPos := state.NewPositionFromState(curState)
+			cp := curState.Save()
 			if err.HasError() {
+				curState.Rollback(cp)
 				return Result[struct{}]{
 					Value:     struct{}{},
 					NextState: curState,
 					Span: state.Span{
-						Start: initialPos,
-						End:   initialPos,
+						Start: cp,
+						End:   cp,
 					},
 				}, Error{}
 			}
