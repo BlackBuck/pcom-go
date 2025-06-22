@@ -191,7 +191,6 @@ func Lexeme[T any](p Parser[T]) Parser[T] {
 					},
 				}, Error{}
 			}
-			
 
 			return res, Error{}
 		},
@@ -304,7 +303,7 @@ func ManyTill[A, B any](label string, p Parser[A], end Parser[B]) Parser[[]A] {
 						Expected: err.Expected,
 						Got:      err.Got,
 						Position: err.Position,
-						Snippet: err.Snippet,
+						Snippet:  err.Snippet,
 						Cause:    &err,
 					}
 				}
