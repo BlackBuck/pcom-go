@@ -3,9 +3,9 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/BlackBuck/pcom-go)](https://goreportcard.com/report/github.com/BlackBuck/pcom-go)
 
 **pcom-go** is a composable, generic **parser combinator library** written in Go, inspired by Haskell's `parsec` and Rust's `nom`.  
-It allows you to write powerful parsers in a modular way — now with **traceable, color-coded error messages**, **generic combinators**, and **support for recursive grammars**.
+It allows you to write powerful parsers in a modular way with **traceable, color-coded error messages**, **generic combinators**, and **support for recursive grammars**.
 
-> Perfect for building parsers for arithmetic expressions, config files, DSLs, or even JSON — in pure Go.
+> Perfect for building parsers for arithmetic expressions, config files, DSLs, or even JSON in pure Go.
 
 ---
 
