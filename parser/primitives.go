@@ -8,23 +8,56 @@ import (
 	state "github.com/BlackBuck/pcom-go/state"
 )
 
+// AnyChar parses any single character.
+// It is a parser that matches any rune and returns it.
+// It is useful for cases where you want to match any character without any specific condition.
+// Eaxmple usage: 
+//   p := AnyChar()
+//   result, err := p.Run(state.NewState("abc", state.Position{Offset: 0, Line: 1, Column: 1}))
+//   if err.HasError() {
+//       fmt.Println("Error:", err) // EOF
+//   } else {
+//       fmt.Println("Matched character:", result.Value)
+//   }
 func AnyChar() Parser[rune] {
-	return CharWhere(func(r rune) bool { return true }, "Any character")
+	return CharWhere("Any character", func(r rune) bool { return true })
 }
 
-// Digit parses a single digit.
+// Digit parses a single digit (0-9).
+// Example usage:
+//   p := Digit()
+//   result, err := p.Run(state.NewState("5abc", state.Position{Offset: 0, Line: 1, Column: 1}))
+//   if err.HasError() {
+//       fmt.Println("Error:", err)
+//   } else {
+//       fmt.Println("Matched digit:", result.Value) // Output: Matched digit: 5
+//   }
 func Digit() Parser[rune] {
-	return CharWhere(func(r rune) bool { return r >= '0' && r <= '9' }, "Digit parser")
+	return CharWhere("Digit parser", func(r rune) bool { return r >= '0' && r <= '9' })
 }
 
-// Alphabet parses the letters a-z and A-Z.
-// Alphabet parses the letters a-z and A-Z.
+// Alpha parses a single alphabetic character (a-z or A-Z).
+// Example usage:
+//   p := Alpha()
+//   result, err := p.Run(state.NewState("abc", state.Position{Offset: 0, Line: 1, Column: 1}))
+//   if err.HasError() {
+//       fmt.Println("Error:", err)
+//   } else {
+//       fmt.Println("Matched letter:", result.Value) // Output: Matched letter: a
+//   }
 func Alpha() Parser[rune] {
-	return CharWhere(func(r rune) bool { return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') }, "Alphabet parser")
+	return CharWhere("Alphabet parser", func(r rune) bool { return (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') })
 }
 
-// AlphaNum parses alphanumeric values (single rune only)
-// AlphaNum parses alphanumeric values (single rune only)
+// AlphaNum parses a single alphanumeric character (a-z, A-Z, or 0-9).
+// Example usage:
+//   p := AlphaNum()
+//   result, err := p.Run(state.NewState("a1b", state.Position{Offset: 0, Line: 1, Column: 1}))
+//   if err.HasError() {
+//       fmt.Println("Error:", err)
+//   } else {
+//       fmt.Println("Matched alphanumeric:", result.Value) // Output: Matched alphanumeric: a
+//   }
 func AlphaNum() Parser[rune] {
 	alpha := Alpha()
 	num := Digit()
@@ -32,15 +65,33 @@ func AlphaNum() Parser[rune] {
 	return Or("Alphanumeric", []Parser[rune]{alpha, num}...)
 }
 
-// Parse a whitespace
-// Parse a whitespace
+// Whitespace parses a single space character (' ').
+// Example usage:
+//   p := Whitespace()
+//   result, err := p.Run(state.NewState(" hello", state.Position{Offset: 0, Line: 1, Column: 1}))
+//   if err.HasError() {
+//       fmt.Println("Error:", err)
+//   } else {
+//       fmt.Printf("Matched whitespace: %q\n", result.Value) // Output: Matched whitespace: ' '
+//   }
 func Whitespace() Parser[rune] {
 	return RuneParser("whitespace", ' ')
 }
 
-// CharWhere parses runes that satisfy a predicate
-// CharWhere parses runes that satisfy a predicate
-func CharWhere(predicate func(rune) bool, label string) Parser[rune] {
+// CharWhere parses a single rune that satisfies the given predicate function.
+// It is a generic parser for matching characters based on custom logic.
+// Example usage:
+//   // Match any vowel
+//   p := CharWhere(func(r rune) bool {
+//       return strings.ContainsRune("aeiouAEIOU", r)
+//   }, "vowel")
+//   result, err := p.Run(state.NewState("apple", state.Position{Offset: 0, Line: 1, Column: 1}))
+//   if err.HasError() {
+//       fmt.Println("Error:", err)
+//   } else {
+//       fmt.Println("Matched vowel:", result.Value) // Output: Matched vowel: a
+//   }
+func CharWhere(label string, predicate func(rune) bool) Parser[rune] {
 	return Parser[rune]{
 		Run: func(curState *state.State) (Result[rune], Error) {
 			if !curState.InBounds(curState.Offset) {
@@ -81,7 +132,15 @@ func CharWhere(predicate func(rune) bool, label string) Parser[rune] {
 }
 
 // StringCI performs case-insensitive string matching.
-// StringCI performs case-insensitive string matching.
+// It returns a parser that matches the given string, ignoring case.
+// Example usage:
+//   p := StringCI("hello")
+//   result, err := p.Run(state.NewState("HeLLo world", state.Position{Offset: 0, Line: 1, Column: 1}))
+//   if err.HasError() {
+//       fmt.Println("Error:", err)
+//   } else {
+//       fmt.Println("Matched string:", result.Value) // Output: Matched string: HeLLo
+//   }
 func StringCI(s string) Parser[string] {
 	lower := strings.ToLower(s)
 	return Parser[string]{
@@ -122,21 +181,35 @@ func StringCI(s string) Parser[string] {
 	}
 }
 
-// OneOf parses any one of the runes in the string.
-// OneOf parses any one of the runes in the string.
+// OneOf parses a single rune that is present in the provided string of characters.
+// It returns a parser that matches any one of the specified runes.
+//
+// Example usage:
+//   p := OneOf("abc")
+//   result, err := p.Run(state.NewState("bxyz", state.Position{Offset: 0, Line: 1, Column: 1}))
+//   if err.HasError() {
+//       fmt.Println("Error:", err)
+//   } else {
+//       fmt.Printf("Matched rune: %q\n", result.Value) // Output: Matched rune: 'b'
+//   }
 func OneOf(chars string) Parser[rune] {
 	set := make(map[rune]bool)
 	for _, c := range chars {
 		set[c] = true
 	}
 
-	return CharWhere(func(r rune) bool {
+	return CharWhere(fmt.Sprintf("one of <%s>", chars), func(r rune) bool {
 		return set[r]
-	}, fmt.Sprintf("one of <%s>", chars))
+	})
 }
 
 // Debug prints the trace every time it runs.
-// Debug prints the trace every time it runs.
+// It wraps a parser and logs its input position, result, and error for debugging purposes.
+//
+// Example usage:
+//   p := Debug(Digit(), "DigitParser")
+//   result, err := p.Run(state.NewState("5abc", state.Position{Offset: 0, Line: 1, Column: 1}))
+//   // Output will include trace logs for the parser execution.
 func Debug[T any](p Parser[T], name string) Parser[T] {
 	return Parser[T]{
 		Run: func(curState *state.State) (result Result[T], error Error) {
@@ -149,8 +222,17 @@ func Debug[T any](p Parser[T], name string) Parser[T] {
 	}
 }
 
-// Try doesn't consume the state if the parser fails.
-// Try doesn't consume the state if the parser fails.
+// Try attempts to run the given parser, but if it fails, it does not consume any input (the state is rolled back).
+// This is useful for backtracking: if the parser fails, parsing can continue as if nothing happened.
+//
+// Example usage:
+//   p := Try(Digit())
+//   result, err := p.Run(state.NewState("abc", state.Position{Offset: 0, Line: 1, Column: 1}))
+//   if err.HasError() {
+//       fmt.Println("No digit found, but input was not consumed.")
+//   } else {
+//       fmt.Println("Matched digit:", result.Value)
+//   }
 func Try[T any](p Parser[T]) Parser[T] {
 	return Parser[T]{
 		Run: func(curState *state.State) (result Result[T], error Error) {
@@ -168,7 +250,18 @@ func Try[T any](p Parser[T]) Parser[T] {
 	}
 }
 
-// lexeme - a wrapper with whitespace skipping
+// Lexeme wraps a parser and consumes any trailing whitespace after it.
+// This is useful for token parsers where you want to ignore spaces after a token.
+//
+// Example usage:
+//   p := Lexeme(Digit())
+//   result, err := p.Run(state.NewState("5   abc", state.Position{Offset: 0, Line: 1, Column: 1}))
+//   if err.HasError() {
+//       fmt.Println("Error:", err)
+//   } else {
+//       fmt.Printf("Matched digit: %v, next input: %q\n", result.Value, result.NextState.Input[result.NextState.Offset:])
+//       // Output: Matched digit: 5, next input: "abc"
+//   }
 func Lexeme[T any](p Parser[T]) Parser[T] {
 	return Parser[T]{
 		Label: fmt.Sprintf("lexeme <%s>", p.Label),
@@ -181,15 +274,12 @@ func Lexeme[T any](p Parser[T]) Parser[T] {
 			}
 			r, err := Whitespace().Run(res.NextState) // consume trailing space
 
-			if !err.HasError() {
-				return Result[T]{
-					Value:     res.Value,
-					NextState: r.NextState,
-					Span: state.Span{
-						Start: res.Span.Start,
-						End:   r.Span.End,
-					},
-				}, Error{}
+			for !err.HasError() {
+				r, err := Whitespace().Run(r.NextState)
+				if err.HasError() {
+					break
+				}
+				res.NextState = r.NextState
 			}
 
 			return res, Error{}
@@ -197,6 +287,19 @@ func Lexeme[T any](p Parser[T]) Parser[T] {
 	}
 }
 
+// TakeWhile parses a sequence of characters while the predicate function returns true.
+// It continues consuming characters until the predicate returns false or the end of input is reached.
+// It returns the matched string and the next state.
+//// Example usage:
+//   p := TakeWhile("Take while digit", func(r byte) bool {
+//       return r >= '0' && r <= '9'
+//   })
+//   result, err := p.Run(state.NewState("123abc", state.Position{Offset: 0, Line: 1, Column: 1}))
+//   if err.HasError() {
+//       fmt.Println("Error:", err)
+//   } else {
+//	   fmt.Println("Matched digits:", result.Value) // Output: Matched digits: 123
+//   }
 func TakeWhile(label string, f func(byte) bool) Parser[string] {
 	return Parser[string]{
 		Run: func(curState *state.State) (result Result[string], error Error) {
@@ -220,6 +323,18 @@ func TakeWhile(label string, f func(byte) bool) Parser[string] {
 	}
 }
 
+// SeparatedBy parses a sequence of elements separated by a delimiter.
+// It returns a slice of the parsed elements.
+// The first element is parsed by the provided parser, and subsequent elements are parsed by the same parser after each delimiter.
+// If the delimiter is not found, it stops parsing and returns the elements parsed so far.
+//// Example usage:
+//   p := SeparatedBy("Separated by comma", Digit(), CharWhere(func(r rune) bool { return r == ',' }, "comma"))	
+//  result, err := p.Run(state.NewState("1,2,3", state.Position{Offset: 0, Line: 1, Column: 1}))
+//  if err.HasError() {
+//      fmt.Println("Error:", err)
+//  } else {
+// 	fmt.Println("Parsed numbers:", result.Value) // Output: Parsed numbers: [1 2 3]
+// }
 func SeparatedBy[A, B any](label string, p Parser[A], delimiter Parser[B]) Parser[[]A] {
 	return Parser[[]A]{
 		Run: func(curState *state.State) (result Result[[]A], error Error) {
@@ -275,6 +390,18 @@ func SeparatedBy[A, B any](label string, p Parser[A], delimiter Parser[B]) Parse
 	}
 }
 
+// ManyTill parses zero or more occurrences of the parser `p` until the parser `end` succeeds.
+// It returns a slice of the parsed elements.
+// If `end` is not found, it continues parsing until the end of input.
+// If `end` is found, it stops parsing and returns the elements parsed so far.
+// Example usage:
+//   p := ManyTill("Many till digit", Digit(), CharWhere("semicolon", func(r rune) bool { return r == ';' }))
+//  result, err := p.Run(state.NewState("123;", state.Position{Offset: 0, Line: 1, Column: 1}))
+// if err.HasError() {
+//    fmt.Println("Error:", err)
+// } else {
+//   fmt.Println("Parsed numbers:", result.Value) // Output: Parsed numbers: [1 2 3]
+// }
 func ManyTill[A, B any](label string, p Parser[A], end Parser[B]) Parser[[]A] {
 	return Parser[[]A]{
 		Run: func(curState *state.State) (result Result[[]A], error Error) {
@@ -325,7 +452,17 @@ func ManyTill[A, B any](label string, p Parser[A], end Parser[B]) Parser[[]A] {
 	}
 }
 
-// Not does not consume any input. It is used to prevent any unwanted match.
+// Not is a lookahead parser that succeeds only if the given parser fails at the current position.
+// It does not consume any input. This is useful for preventing unwanted matches or implementing negative lookahead.
+//
+// Example usage:
+//   p := Not("not digit", Digit())
+//   result, err := p.Run(state.NewState("abc", state.Position{Offset: 0, Line: 1, Column: 1}))
+//   if err.HasError() {
+//       fmt.Println("Matched a digit (unexpected).")
+//   } else {
+//       fmt.Println("No digit found at the current position.") // Output: No digit found at the current position.
+//   }
 func Not[T any](label string, p Parser[T]) Parser[struct{}] {
 	return Parser[struct{}]{
 		Run: func(curState *state.State) (result Result[struct{}], error Error) {

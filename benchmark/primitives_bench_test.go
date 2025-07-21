@@ -40,9 +40,9 @@ func BenchmarkWhitespace(b *testing.B) {
 }
 
 func BenchmarkCharWhere(b *testing.B) {
-	parser := parser.CharWhere(func(r rune) bool {
+	parser := parser.CharWhere("a or z", func(r rune) bool {
 		return r == 'a' || r == 'z'
-	}, "a or z")
+	})
 	s := state.NewState("az", state.Position{Offset: 0, Line: 1, Column: 1})
 	for i := 0; i < b.N; i++ {
 		_, _ = parser.Run(&s)
