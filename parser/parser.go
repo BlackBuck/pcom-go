@@ -12,10 +12,10 @@ type Pair[A, B any] struct {
 	Right B
 }
 
-// Result `struct` stores the result of a parser.
-// `Value` depends on the type of the parser.
-// `NextState` stores a copy of the state after parser has done its work.
-// `Span` determines the start and end position of the result in the Input.
+// Result represents the outcome of a parser.
+// Value holds the parsed value of type T.
+// NextState is the parser state after parsing is complete.
+// Span indicates the range in the input that was consumed by the parser.
 type Result[T any] struct {
 	Value     T
 	NextState *state.State
@@ -31,9 +31,12 @@ func NewResult[T any](value T, nextState *state.State, span state.Span) Result[T
 	return Result[T]{value, nextState, span}
 }
 
-// RuneParser parses a single rune.
-// It returns an EOF error if entire input had been parsed earlier.
-// If it matches the input rune successfully, it returns it with the `Result` else returns an Error.
+// RuneParser parses a single rune from the input.
+// If the end of input is reached, it returns an EOF error.
+// If the next input rune matches the expected rune, it returns it in the Result.
+// Otherwise, it returns an Error indicating the mismatch.
+// Example: RuneParser("myRune", 'a') will parse 'a' from the input.
+// If the input does not match 'a' at the current position, it returns an error.
 func RuneParser(label string, c rune) Parser[rune] {
 	return Parser[rune]{
 		Run: func(curState *state.State) (Result[rune], Error) {
@@ -72,7 +75,12 @@ func RuneParser(label string, c rune) Parser[rune] {
 	}
 }
 
-// StringParser parses a string(case-sensitive).
+// StringParser parses the exact string s (case-sensitive) from the input.
+// If the input does not match s at the current position, it returns an error.
+// Example: StringParser("myString", "hello") will parse "hello" from the input.
+// If the input does not match "hello" at the current position, it returns an error.
+// If the input matches, it returns the parsed string and updates the state.
+// If the end of input is reached before matching, it returns an EOF error.
 func StringParser(label string, s string) Parser[string] {
 	return Parser[string]{
 		Run: func(curState *state.State) (Result[string], Error) {
@@ -116,9 +124,21 @@ func StringParser(label string, s string) Parser[string] {
 	}
 }
 
-// Or performs a logical OR operation between the input parsers.
-// It returns, lazily, the Result after the first parser succeeds.
-// If no parser succeeds, it returns the furthest error.
+// Or tries each parser in order and returns the result of the first one that succeeds.
+// If all parsers fail, it returns the error from the parser that got the furthest.
+// This is useful for alternatives, e.g. parsing either an integer or a string.
+//
+// Example usage:
+//
+//   intParser := parser.StringParser("int", "123")
+//   strParser := parser.StringParser("str", "abc")
+//   altParser := parser.Or("int or str", intParser, strParser)
+//   res, err := altParser.Run(state)
+//   // res.Value will be "123" or "abc" depending on input
+// // If both parsers fail, err will contain the error from the last parser that was tried.
+// // Note: The error returned will have the position of the last parser that was tried,
+// // so you can see where the failure occurred in the input.
+// // If you want to handle the error, you can check if err.HasError() is true.
 func Or[T any](label string, parsers ...Parser[T]) Parser[T] {
 	return Parser[T]{
 		Run: func(curState *state.State) (Result[T], Error) {
@@ -147,9 +167,18 @@ func Or[T any](label string, parsers ...Parser[T]) Parser[T] {
 	}
 }
 
-// And performs a logical AND operation between the parsers.
-// It returns the Result after all the parsers succeed.
-// If any parser fails, it returns an error of that parser failing.
+// And runs all provided parsers at the same input position (without advancing the state).
+// It succeeds only if all parsers succeed at that position, returning the last parser's result.
+// If any parser fails, it returns an error for that parser.
+//
+// Example usage:
+//
+//   alpha := parser.Alpha("alphabet") // See parser/primitives.go for more details
+//   a := parser.RuneParser("a", 'a')
+//   andParser := parser.And("alphabetic and a", alpha, a)
+//   res, err := andParser.Run(state)
+//   // res.Value will be the result of the last parser if both succeed at the same position.
+//   // If either fails, err will contain the error.
 func And[T any](label string, parsers ...Parser[T]) Parser[T] {
 	return Parser[T]{
 		Run: func(curState *state.State) (Result[T], Error) {
@@ -178,9 +207,16 @@ func And[T any](label string, parsers ...Parser[T]) Parser[T] {
 	}
 }
 
-// Many0 checks for the presence of a parser zero or more times.
-// It returns an array of Result (empty if none succeeds).
-// It does not return an error.
+// Many0 applies the given parser zero or more times, collecting the results in a slice.
+// It always succeeds, returning an empty slice if the parser never succeeds.
+// No error is returned, even if the parser fails on the first attempt.
+//
+// Example usage:
+//
+//   digit := parser.RuneParser("digit", '1')
+//   digits := parser.Many0("zero or more 1s", digit)
+//   res, err := digits.Run(state)
+//   // res.Value will be []rune containing all parsed '1's in sequence (possibly empty).
 func Many0[T any](label string, p Parser[T]) Parser[[]T] {
 	return Parser[[]T]{
 		Run: func(curState *state.State) (Result[[]T], Error) {
@@ -207,8 +243,16 @@ func Many0[T any](label string, p Parser[T]) Parser[[]T] {
 	}
 }
 
-// Many1 checks for the presence of a parser one or more times.
-// It is similar to Many0, but returns an error if it cannot parse even once.
+// Many1 applies the given parser one or more times, collecting the results in a slice.
+// It succeeds only if the parser matches at least once; otherwise, it returns an error.
+//
+// Example usage:
+//
+//   digit := parser.RuneParser("digit", '1')
+//   digits := parser.Many1("one or more 1s", digit)
+//   res, err := digits.Run(state)
+//   // res.Value will be []rune containing all parsed '1's in sequence (must be non-empty).
+//   // If no '1' is found at the current position, err will be non-nil.
 func Many1[T any](label string, p Parser[T]) Parser[[]T] {
 	return Parser[[]T]{
 		Run: func(curState *state.State) (Result[[]T], Error) {
@@ -251,8 +295,16 @@ func Many1[T any](label string, p Parser[T]) Parser[[]T] {
 	}
 }
 
-// Optional checks for the presence of a parser zero or one times.
-// It does not return any error.
+// Optional tries to apply the given parser once, returning its result if it succeeds,
+// or a zero value if it fails. It never returns an error.
+//
+// Example usage:
+//
+//   digit := parser.RuneParser("digit", '1')
+//   optDigit := parser.Optional("optional 1", digit)
+//   res, err := optDigit.Run(state)
+//   // res.Value will be '1' if present, or the zero value for rune if not.
+//   // err will always be nil.
 func Optional[T any](label string, p Parser[T]) Parser[T] {
 	return Parser[T]{
 		Run: func(curState *state.State) (Result[T], Error) {
@@ -271,9 +323,17 @@ func Optional[T any](label string, p Parser[T]) Parser[T] {
 	}
 }
 
-// Sequence sequentially parses the input based on the parsers.
-// It returns the Result after successfully running the last parser.
-// If any parser fails, it returns an error.
+// Sequence runs a list of parsers in order, advancing the input for each.
+// It returns the result of the last parser if all succeed.
+// If any parser fails, it returns an error and rolls back the input.
+//
+// Example usage:
+//
+//   p1 := parser.StringParser("hello", "hello")
+//   p2 := parser.StringParser("world", "world")
+//   seq := parser.Sequence("hello then world", []parser.Parser[string]{p1, p2})
+//   res, err := seq.Run(state)
+//   // res.Value will be "world" if both parsers succeed in sequence.
 func Sequence[T any](label string, parsers []Parser[T]) Parser[T] {
 	return Parser[T]{
 		Run: func(curState *state.State) (Result[T], Error) {
@@ -301,7 +361,17 @@ func Sequence[T any](label string, parsers []Parser[T]) Parser[T] {
 	}
 }
 
-// Map parses the output of one parser(p1) to a function.
+// Map transforms the result of a parser using a provided function.
+// It runs the parser p1, and if it succeeds, applies the function f to its result.
+// If p1 fails, Map returns the error from p1.
+//
+// Example usage:
+//
+//   digitParser := parser.RuneParser("digit", '1')
+//   toInt := func(r rune) int { return int(r - '0') }
+//   intParser := parser.Map("digit to int", digitParser, toInt)
+//   res, err := intParser.Run(state)
+//   // res.Value will be 1 if the input is '1'
 func Map[A, B any](label string, p1 Parser[A], f func(A) B) Parser[B] {
 	return Parser[B]{
 		Run: func(curState *state.State) (result Result[B], error Error) {
@@ -332,9 +402,17 @@ func Map[A, B any](label string, p1 Parser[A], f func(A) B) Parser[B] {
 	}
 }
 
-// Then is used to run two parses one after the other.
-// It returns a Pair containing the result of both parsers.
-// If any parser fails, it returns an adequate error.
+// Then runs two parsers sequentially: first p1, then p2, advancing the input for each.
+// It returns a Pair containing the results of both parsers if both succeed.
+// If either parser fails, it returns an error and rolls back the input.
+//
+// Example usage:
+//
+//   p1 := parser.StringParser("hello", "hello")
+//   p2 := parser.StringParser("world", "world")
+//   seq := parser.Then("hello then world", p1, p2)
+//   res, err := seq.Run(state)
+//   // res.Value.Left will be "hello", res.Value.Right will be "world" if both succeed.
 func Then[A, B any](label string, p1 Parser[A], p2 Parser[B]) Parser[Pair[A, B]] {
 	return Parser[Pair[A, B]]{
 		Run: func(curState *state.State) (result Result[Pair[A, B]], error Error) {
@@ -378,7 +456,17 @@ func Then[A, B any](label string, p1 Parser[A], p2 Parser[B]) Parser[Pair[A, B]]
 	}
 }
 
-// KeepLeft is used to keep the result of the Left parser and discard the Right part.
+// KeepLeft returns a parser that keeps only the Left value from a Pair produced by the given parser.
+// This is useful when you want to sequence two parsers but only care about the result of the first.
+//
+// Example usage:
+//
+//   p1 := parser.StringParser("hello", "hello")
+//   p2 := parser.StringParser("world", "world")
+//   pairParser := parser.Then("hello then world", p1, p2)
+//   leftOnly := parser.KeepLeft("keep hello", pairParser)
+//   res, err := leftOnly.Run(state)
+//   // res.Value will be "hello" if both parsers succeed.
 func KeepLeft[A, B any](label string, p Parser[Pair[A, B]]) Parser[A] {
 	return Parser[A]{
 		Run: func(curState *state.State) (result Result[A], error Error) {
@@ -406,7 +494,17 @@ func KeepLeft[A, B any](label string, p Parser[Pair[A, B]]) Parser[A] {
 	}
 }
 
-// KeepRight is used to keep teh result of the Right parser and discard the Left part.
+// KeepRight returns a parser that keeps only the Right value from a Pair produced by the given parser.
+// This is useful when you want to sequence two parsers but only care about the result of the second.
+//
+// Example usage:
+//
+//   p1 := parser.StringParser("hello", "hello")
+//   p2 := parser.StringParser("world", "world")
+//   pairParser := parser.Then("hello then world", p1, p2)
+//   rightOnly := parser.KeepRight("keep world", pairParser)
+//   res, err := rightOnly.Run(state)
+//   // res.Value will be "world" if both parsers succeed.
 func KeepRight[A, B any](label string, p Parser[Pair[A, B]]) Parser[B] {
 	return Parser[B]{
 		Run: func(curState *state.State) (result Result[B], error Error) {
@@ -434,9 +532,18 @@ func KeepRight[A, B any](label string, p Parser[Pair[A, B]]) Parser[B] {
 	}
 }
 
-// Between is used to parse any content that is present between open and close parsers.
-// It returns the Result of the content parser.
-// It returns an error if any of open, content, or close fails.
+// Between parses content that is surrounded by an open and a close parser.
+// It returns the result of the content parser if all three parsers succeed in sequence.
+// If any of open, content, or close fails, it returns an error.
+//
+// Example usage:
+//
+//   openParen := parser.RuneParser("open paren", '(')
+//   closeParen := parser.RuneParser("close paren", ')')
+//   inner := parser.StringParser("digits", "123")
+//   betweenParens := parser.Between("digits in parens", openParen, inner, closeParen)
+//   res, err := betweenParens.Run(state)
+//   // res.Value will be "123" if the input is "(123)"
 func Between[L, C, R any](label string, open Parser[L], content Parser[C], close Parser[R]) Parser[C] {
 	return Parser[C]{
 		Run: func(curState *state.State) (result Result[C], error Error) {
@@ -463,8 +570,19 @@ func Between[L, C, R any](label string, open Parser[L], content Parser[C], close
 	}
 }
 
-// Lazy parser is used to lazily parse a parser.
-// Useful for left-recursive parsing.
+// Lazy creates a parser that defers the construction of its inner parser until first use.
+// This is useful for defining recursive parsers, such as for left-recursive grammars.
+//
+// Example usage:
+//
+//   var expr Parser[int]
+//   expr = Lazy("expr", func() Parser[int] {
+//       // expr can reference itself recursively here
+//       return Or("sum",
+//           Then("add", expr, plusOp), // left-recursive
+//           numberParser,
+//       )
+//   })
 func Lazy[T any](label string, f func() Parser[T]) Parser[T] {
 	var p Parser[T]
 	var once sync.Once // thread-safe Lazy init
@@ -480,7 +598,19 @@ func Lazy[T any](label string, f func() Parser[T]) Parser[T] {
 	}
 }
 
-// Chainl1 parses one or more p values separated by op, and folds them left-associatively
+// Chainl1 parses one or more values using parser p, separated by the operator parser op,
+// and folds them left-associatively. This is useful for parsing left-associative binary
+// operations such as addition or subtraction.
+//
+// Example usage:
+//
+//   num := parser.StringParser("number", "1")
+//   plus := parser.Map("plus", parser.RuneParser("plus", '+'), func(_ rune) func(int, int) int {
+//       return func(a, b int) int { return a + b }
+//   })
+//   expr := parser.Chainl1("sum", num, plus)
+//   res, err := expr.Run(state)
+//   // Parses "1+1+1" as ((1+1)+1)
 func Chainl1[T any](label string, p Parser[T], op Parser[func(T, T) T]) Parser[T] {
 	return Parser[T]{
 		Run: func(curState *state.State) (result Result[T], error Error) {
@@ -535,6 +665,19 @@ func Chainl1[T any](label string, p Parser[T], op Parser[func(T, T) T]) Parser[T
 	}
 }
 
+// Chainr1 parses one or more values using parser p, separated by the operator parser op,
+// and folds them right-associatively. This is useful for parsing right-associative binary
+// operations such as exponentiation.
+//
+// Example usage:
+//
+//   num := parser.StringParser("number", "2")
+//   pow := parser.Map("pow", parser.RuneParser("pow", '^'), func(_ rune) func(int, int) int {
+//       return func(a, b int) int { return int(math.Pow(float64(a), float64(b))) }
+//   })
+//   expr := parser.Chainr1("power", num, pow)
+//   res, err := expr.Run(state)
+//   // Parses "2^3^2" as 2^(3^2)
 func Chainr1[T any](label string, p Parser[T], op Parser[func(T, T) T]) Parser[T] {
 	return Parser[T]{
 		Run: func(curState *state.State) (result Result[T], error Error) {

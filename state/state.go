@@ -195,12 +195,15 @@ func isCRLF(s *State) bool {
 	return false
 }
 
-// Return current position as a checkpoint
+// Save creates a checkpoint of the current state.
+// This is used to rollback to a previous state if needed.
+// Example usage: when parsing a string, if the string does not match, we can rollback to the checkpoint.
 func (s *State) Save() Position {
 	return NewPositionFromState(s)
 }
 
-// Rollback to a checkpoint cp
+// Rollback to a previous checkpoint.
+// This will reset the state to the position specified by cp.
 func (s *State) Rollback(cp Position) {
 	s.Offset = cp.Offset
 	s.Line = cp.Line
