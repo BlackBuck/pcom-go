@@ -41,6 +41,16 @@ func (b BinaryOp) Eval() int {
 		return left * right
 	case "/":
 		return left / right
+	case "&":
+        return left & right
+    case "|":
+        return left | right
+    case "^":
+        return left ^ right
+    case "<<":
+        return left << right
+    case ">>":
+        return left >> right
 	default:
 		panic("Unknown operator: " + b.Op)
 	}
@@ -85,8 +95,13 @@ func parseOperator() parser.Parser[string] {
 	minus := parser.StringParser("minus", "-")
 	multiply := parser.StringParser("multiply", "*")
 	divide := parser.StringParser("divide", "/")
+	and := parser.StringParser("bitwise and", "&")
+    or := parser.StringParser("bitwise or", "|")
+    xor := parser.StringParser("bitwise xor", "^")
+    lshift := parser.StringParser("bitwise lshift", "<<")
+    rshift := parser.StringParser("bitwise rshift", ">>")
 
-	return parser.Or("operator", plus, minus, multiply, divide)
+    return parser.Or("operator", plus, minus, multiply, divide, lshift, rshift, and, or, xor)
 }
 
 // Forward declaration for recursive parsing
@@ -128,7 +143,7 @@ func parsePrimary() parser.Parser[Expr] {
 	return parser.Or("primary", parseNumber(), parseParens())
 }
 
-// Parse a term (handles * and /)
+// Parse a term (handles * , / , << , >>)
 func parseTerm() parser.Parser[Expr] {
 	return parser.Parser[Expr]{
 		Run: func(curState *state.State) (parser.Result[Expr], parser.Error) {
@@ -151,8 +166,8 @@ func parseTerm() parser.Parser[Expr] {
 					break
 				}
 
-				// Only continue for * and /
-				if opResult.Value != "*" && opResult.Value != "/" {
+				// Only continue for * and / << >>
+				if opResult.Value != "*" && opResult.Value != "/" && opResult.Value != "<<" && opResult.Value != ">>" {
 					curState.Rollback(cp)
 					break
 				}
@@ -180,7 +195,7 @@ func parseTerm() parser.Parser[Expr] {
 	}
 }
 
-// Parse an expression (handles + and -)
+// Parse an expression (handles + , - , & , | , ^)
 func parseExpr() parser.Parser[Expr] {
 	return parser.Parser[Expr]{
 		Run: func(curState *state.State) (parser.Result[Expr], parser.Error) {
@@ -203,8 +218,8 @@ func parseExpr() parser.Parser[Expr] {
 					break
 				}
 
-				// Only continue for + and -
-				if opResult.Value != "+" && opResult.Value != "-" {
+				// Only continue for + - & | ^
+				if opResult.Value != "+" && opResult.Value != "-" && opResult.Value != "&" && opResult.Value != "|" && opResult.Value != "^" {
 					curState.Rollback(cp)
 					break
 				}
@@ -254,6 +269,13 @@ func main() {
 		"(2 + 3) * 4",       // Should be 20 (2+3 first, then *4)
 		"10 + 2 * 3 - 4",    // Should be 12 (2*3=6, 10+6=16, 16-4=12)
 		"(1 + 2) * (3 + 4)", // Should be 21 (1+2=3, 3+4=7, 3*7=21)
+		"5 & 3",             // Should be 1
+        "5 | 2",             // Should be 7
+        "5 ^ 1",             // Should be 4
+        "8 << 2",            // Should be 32
+        "8 >> 1",            // Should be 4
+        "2 + 3 & 1",         // Should be 1 (2+3=5, 5&1=1)
+        "(2 + 3) << 2",      // Should be 20 ((2+3)=5, 5<<2=20)
 	}
 
 	parser := parseArithmeticExpression()
